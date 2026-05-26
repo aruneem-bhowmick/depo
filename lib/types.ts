@@ -5,7 +5,7 @@ export interface Repo {
   description: string | null
   fork: boolean
   stargazerCount: number
-  updatedAt: string     // ISO 8601
+  updatedAt: string | null
   url: string           // GitHub web URL
   visibility: 'public' | 'private'
 }
