@@ -4,5 +4,5 @@ import { sessionOptions } from './sessionOptions'
 import type { SessionData } from './types'
 
 export async function getSession() {
-  return getIronSession<SessionData>(cookies(), sessionOptions)
+  return getIronSession<SessionData>(await cookies(), sessionOptions)
 }
