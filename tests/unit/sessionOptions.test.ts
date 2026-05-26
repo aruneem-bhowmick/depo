@@ -22,3 +22,20 @@ describe('sessionOptions', () => {
     expect(sessionOptions.cookieOptions?.secure).toBe(false)
   })
 })
+
+describe('SESSION_SECRET validation', () => {
+  const originalSecret = process.env.SESSION_SECRET
+
+  afterEach(() => {
+    process.env.SESSION_SECRET = originalSecret
+    jest.resetModules()
+  })
+
+  it('throws if SESSION_SECRET is not defined', async () => {
+    delete process.env.SESSION_SECRET
+    jest.resetModules()
+    await expect(import('@/lib/sessionOptions')).rejects.toThrow(
+      'SESSION_SECRET environment variable is required',
+    )
+  })
+})
