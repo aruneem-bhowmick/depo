@@ -8,7 +8,7 @@ const PROTECTED = ['/repos', '/confirm', '/done']
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (PROTECTED.some(path => pathname.startsWith(path))) {
+  if (PROTECTED.some(path => pathname === path || pathname.startsWith(`${path}/`))) {
     const response = NextResponse.next()
     const session = await getIronSession<SessionData>(request, response, sessionOptions)
 

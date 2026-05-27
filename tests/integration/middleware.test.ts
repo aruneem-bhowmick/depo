@@ -74,5 +74,15 @@ describe('middleware', () => {
       await middleware(makeRequest('/api/auth/callback'))
       expect(mockGetIronSession).not.toHaveBeenCalled()
     })
+
+    it('does not protect false-prefix paths like /repos-test', async () => {
+      await middleware(makeRequest('/repos-test'))
+      expect(mockGetIronSession).not.toHaveBeenCalled()
+    })
+
+    it('does not protect false-prefix paths like /confirm-email', async () => {
+      await middleware(makeRequest('/confirm-email'))
+      expect(mockGetIronSession).not.toHaveBeenCalled()
+    })
   })
 })
