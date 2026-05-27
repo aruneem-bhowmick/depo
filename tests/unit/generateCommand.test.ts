@@ -1,5 +1,43 @@
 import { generateCommand } from '@/lib/generateCommand'
 
+describe('generateCommand() — input validation', () => {
+  it('throws on an owner containing a space', () => {
+    expect(() => generateCommand('bad owner', ['repo'], 'gh')).toThrow('Invalid GitHub owner')
+  })
+
+  it('throws on an owner containing a semicolon', () => {
+    expect(() => generateCommand('owner;rm -rf /', ['repo'], 'gh')).toThrow('Invalid GitHub owner')
+  })
+
+  it('throws on an owner containing a $( sequence', () => {
+    expect(() => generateCommand('owner$(id)', ['repo'], 'gh')).toThrow('Invalid GitHub owner')
+  })
+
+  it('throws on a repo name containing a space (gh mode)', () => {
+    expect(() => generateCommand('alice', ['bad repo'], 'gh')).toThrow('Invalid repository name: bad repo')
+  })
+
+  it('throws on a repo name containing a semicolon (gh mode)', () => {
+    expect(() => generateCommand('alice', ['repo;rm -rf /'], 'gh')).toThrow('Invalid repository name: repo;rm -rf /')
+  })
+
+  it('throws on a repo name containing a $( sequence (gh mode)', () => {
+    expect(() => generateCommand('alice', ['repo$(id)'], 'gh')).toThrow('Invalid repository name: repo$(id)')
+  })
+
+  it('throws on a repo name containing a space (curl mode)', () => {
+    expect(() => generateCommand('alice', ['bad repo'], 'curl')).toThrow('Invalid repository name: bad repo')
+  })
+
+  it('throws on a repo name containing a semicolon (curl mode)', () => {
+    expect(() => generateCommand('alice', ['repo;rm -rf /'], 'curl')).toThrow('Invalid repository name: repo;rm -rf /')
+  })
+
+  it('throws on a repo name containing a $( sequence (curl mode)', () => {
+    expect(() => generateCommand('alice', ['repo$(id)'], 'curl')).toThrow('Invalid repository name: repo$(id)')
+  })
+})
+
 describe('generateCommand() — gh mode', () => {
   it('returns empty string for empty repos array', () => {
     expect(generateCommand('alice', [], 'gh')).toBe('')
