@@ -34,9 +34,9 @@ The OAuth flow uses a state parameter to prevent [CSRF attacks on the authorizat
 
 1. Before redirecting to GitHub, the landing page generates a random nonce and stores it in a short-lived `depo_oauth_state` cookie.
 2. The nonce is also passed as the `state` query parameter in the GitHub OAuth authorize URL.
-3. When GitHub redirects back to `/api/auth/callback`, the route reads `state` from the query string and compares it to the `depo_oauth_state` cookie.
-4. If they don't match, the callback returns `400` and discards the code — no token exchange occurs.
-5. On successful validation, the `depo_oauth_state` cookie is deleted.
+3. When GitHub redirects back to `/api/auth/callback`, the route reads `state` from the query string and compares it to the `depo_oauth_state` cookie. This check runs **before any network call** — the token exchange is never attempted if the state is invalid.
+4. If the values are missing or don't match, the callback redirects to `/?error=auth_failed` and discards the code — no token exchange occurs.
+5. On successful validation and session write, the `depo_oauth_state` cookie is deleted via a `Set-Cookie` header on the redirect response to `/repos`.
 
 This ensures that only the browser that initiated the sign-in flow can complete it.
 
