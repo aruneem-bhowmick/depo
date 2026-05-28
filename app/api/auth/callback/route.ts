@@ -18,26 +18,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
   }
 
-  const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code,
-    }),
-  })
-
-  const tokenData = await tokenResponse.json()
-
-  if (!tokenData.access_token || tokenData.error) {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    console.error('Missing GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET')
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
   }
 
-  const accessToken = tokenData.access_token as string
+  let accessToken = ''
+  try {
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      }),
+    })
+    const tokenData = await tokenResponse.json()
+    if (!tokenData.access_token || tokenData.error) {
+      return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
+    }
+    accessToken = tokenData.access_token as string
+  } catch (error) {
+    console.error('Token exchange failed:', error)
+    return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
+  }
 
   const userResponse = await fetch('https://api.github.com/user', {
     headers: {

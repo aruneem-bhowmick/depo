@@ -29,6 +29,8 @@ const mockSession = { accessToken: '', login: '', avatarUrl: '', save: jest.fn()
 
 beforeEach(() => {
   jest.clearAllMocks()
+  process.env.GITHUB_CLIENT_ID = 'test-client-id'
+  process.env.GITHUB_CLIENT_SECRET = 'test-client-secret'
   mockGetSession.mockResolvedValue(mockSession)
   mockCookies.mockReturnValue({
     get: jest.fn((name: string) =>
@@ -36,6 +38,11 @@ beforeEach(() => {
     ),
     delete: jest.fn(),
   })
+})
+
+afterEach(() => {
+  delete process.env.GITHUB_CLIENT_ID
+  delete process.env.GITHUB_CLIENT_SECRET
 })
 
 describe('GET /api/auth/callback', () => {
