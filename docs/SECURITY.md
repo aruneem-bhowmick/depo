@@ -34,11 +34,25 @@ The OAuth flow uses a state parameter to prevent [CSRF attacks on the authorizat
 
 1. Before redirecting to GitHub, the landing page generates a random nonce and stores it in a short-lived `depo_oauth_state` cookie.
 2. The nonce is also passed as the `state` query parameter in the GitHub OAuth authorize URL.
-3. When GitHub redirects back to `/api/auth/callback`, the route reads `state` from the query string and compares it to the `depo_oauth_state` cookie.
-4. If they don't match, the callback returns `400` and discards the code — no token exchange occurs.
-5. On successful validation, the `depo_oauth_state` cookie is deleted.
+3. When GitHub redirects back to `/api/auth/callback`, the route reads `state` from the query string and compares it to the `depo_oauth_state` cookie. This check runs **before any network call** — the token exchange is never attempted if the state is invalid.
+4. If the values are missing or don't match, the callback redirects to `/?error=auth_failed` and discards the code — no token exchange occurs.
+5. On successful validation and session write, the `depo_oauth_state` cookie is deleted via a `Set-Cookie` header on the redirect response to `/repos`.
 
 This ensures that only the browser that initiated the sign-in flow can complete it.
+
+---
+
+## Network-Layer Resilience in the OAuth Callback
+
+Beyond CSRF and response-content validation, the callback route is hardened against infrastructure-level failures that could otherwise crash the serverless function:
+
+- **Missing OAuth app credentials**: `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are validated at request time. If either is absent (misconfigured deployment), the route redirects to `/?error=auth_failed` immediately with a server-side `console.error` for observability — it does not silently pass `undefined` to the token exchange body.
+- **Token exchange network failure**: the `fetch` call to GitHub's token endpoint is wrapped in a try/catch. DNS failures, connection resets, and timeouts are caught and redirected rather than propagated as unhandled exceptions.
+- **User profile fetch network failure**: the `fetch` call to `api.github.com/user` is independently wrapped. A transient failure here also redirects safely.
+- **Profile field validation**: after parsing the user profile JSON, the `login` field is checked for presence and string type before being written to the session. A malformed or unexpected API response does not silently produce a session with an undefined or empty login.
+- **Session save failure**: the `iron-session` save call is wrapped in a try/catch. Although unlikely, an encryption or I/O error during session serialisation is caught and redirected rather than crashing the route.
+
+Every failure path, at every layer, redirects to `/?error=auth_failed`. The route never returns a `4xx` or `5xx` directly, ensuring the user always lands on the landing page where an error message can be displayed.
 
 ---
 

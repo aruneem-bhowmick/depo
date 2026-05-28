@@ -29,15 +29,29 @@ Handles the GitHub OAuth redirect. Exchanges the authorization code for an acces
 
 **Failure responses**:
 
+All failure paths redirect to `/?error=auth_failed` — the route never returns a `4xx` or `5xx` directly. The CSRF state check runs before any network call; if it fails, no token exchange is attempted.
+
 | Condition | Behavior |
 |-----------|----------|
-| `state` mismatch | Returns `400 Bad Request` |
-| GitHub token exchange fails | Redirects to `/?error=auth_failed` |
-| GitHub `access_token` missing in response | Redirects to `/?error=auth_failed` |
+| `state` param missing or does not match `depo_oauth_state` cookie | Redirects to `/?error=auth_failed` |
+| `code` param missing | Redirects to `/?error=auth_failed` |
+| `GITHUB_CLIENT_ID` or `GITHUB_CLIENT_SECRET` env vars absent | Redirects to `/?error=auth_failed` |
+| Token exchange fetch throws (DNS failure, timeout, connection reset) | Redirects to `/?error=auth_failed` |
+| GitHub token exchange returns an `error` field (e.g. `bad_verification_code`) | Redirects to `/?error=auth_failed` |
+| GitHub token exchange returns no `access_token` | Redirects to `/?error=auth_failed` |
+| GitHub user profile fetch throws a network error | Redirects to `/?error=auth_failed` |
+| GitHub user profile fetch returns a non-OK status | Redirects to `/?error=auth_failed` |
+| User profile response missing or non-string `login` field | Redirects to `/?error=auth_failed` |
+| Session save fails (encryption or I/O error) | Redirects to `/?error=auth_failed` |
 
 **Side effects**:
-- Writes `{ accessToken, login, avatarUrl }` to the `depo_session` cookie
-- Deletes the `depo_oauth_state` cookie
+- Writes `{ accessToken, login, avatarUrl }` to the `depo_session` cookie (`avatar_url` defaults to `''` if absent from the GitHub response)
+- Deletes the `depo_oauth_state` cookie via `Set-Cookie: depo_oauth_state=; Expires=<epoch>` on the redirect response
+
+**Implementation notes**:
+- The token exchange POST must include `Accept: application/json`; without it GitHub returns URL-encoded form data instead of JSON.
+- The user profile fetch uses the `Bearer` authorization scheme (the `token` scheme is deprecated by GitHub).
+- All three outbound network operations (token exchange, user profile fetch, session save) are wrapped in independent try/catch blocks. Unhandled exceptions in any of them redirect to `/?error=auth_failed` rather than crashing the route with an unhandled 500.
 
 ---
 
