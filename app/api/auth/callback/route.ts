@@ -47,23 +47,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
   }
 
-  const userResponse = await fetch('https://api.github.com/user', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-    },
-  })
-
-  if (!userResponse.ok) {
+  let login = ''
+  let avatarUrl = ''
+  try {
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    if (!userResponse.ok) {
+      return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
+    }
+    const userData = await userResponse.json()
+    if (!userData.login || typeof userData.login !== 'string') {
+      console.error('Invalid user data: missing or invalid login')
+      return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
+    }
+    login = userData.login
+    avatarUrl = (userData.avatar_url as string) || ''
+  } catch (error) {
+    console.error('User profile fetch failed:', error)
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
   }
 
-  const userData = await userResponse.json()
-
   const session = await getSession()
   session.accessToken = accessToken
-  session.login = userData.login as string
-  session.avatarUrl = userData.avatar_url as string
+  session.login = login
+  session.avatarUrl = avatarUrl
   await session.save()
 
   const response = NextResponse.redirect(new URL('/repos', request.url))
