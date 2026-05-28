@@ -1,0 +1,111 @@
+# Development
+
+---
+
+## Running the App
+
+```bash
+npm run dev      # start Next.js dev server at http://localhost:3000
+npm run build    # production build
+npm start        # serve production build locally
+```
+
+---
+
+## Testing
+
+### Unit and Integration Tests (Jest)
+
+```bash
+npm test                  # run all Jest tests once
+npm test -- --watch       # watch mode
+npm test -- --coverage    # generate coverage report
+```
+
+**Test layout**:
+
+```
+tests/
+├── unit/
+│   ├── config.test.ts          next.config.ts image domain validation
+│   ├── constants.test.ts       constants values and key uniqueness
+│   ├── generateCommand.test.ts gh and curl command generation (13 cases)
+│   ├── github.test.ts          createOctokit, listPublicRepos, deleteRepo
+│   ├── session.test.ts         getSession() helper
+│   ├── sessionOptions.test.ts  cookie config properties
+│   ├── smoke.test.ts           basic sanity checks
+│   ├── types.test.ts           Repo / DeletionResult / SessionData conformance
+│   └── vercelJson.test.ts      vercel.json maxDuration for delete route
+└── integration/
+    └── middleware.test.ts      auth redirect behavior (8 cases)
+```
+
+**Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
+
+### Mock Patterns
+
+Tests mock at the module boundary rather than calling real external services:
+
+```ts
+// Mock next/headers (used by server components and API routes)
+jest.mock('next/headers', () => ({ cookies: jest.fn() }))
+
+// Mock iron-session
+jest.mock('iron-session', () => ({ getIronSession: jest.fn() }))
+
+// Mock @octokit/rest
+jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }))
+
+// Mock global fetch for API route tests
+global.fetch = jest.fn()
+```
+
+### End-to-End Tests (Playwright)
+
+```bash
+npx playwright test          # run E2E suite (requires running app)
+npx playwright test --ui     # interactive UI mode
+```
+
+**Playwright configuration**: `config/playwright.config.ts` — Chromium only, `baseURL: http://localhost:3000`. The E2E suite covers full user flows: sign-in, repo selection, confirm, deletion, and summary.
+
+> E2E tests require the app to be running (`npm run dev`) and a valid `.env.local` configured with real GitHub OAuth credentials.
+
+---
+
+## Linting
+
+```bash
+npm run lint         # ESLint with eslint-config-next
+```
+
+The ESLint config is at `.eslintrc.json`. It extends `next/core-web-vitals` which covers React, accessibility, and Next.js-specific rules.
+
+---
+
+## Type Checking
+
+```bash
+npx tsc --noEmit     # type-check without emitting output
+```
+
+TypeScript is configured in `tsconfig.json` with `strict: true`. All public APIs use typed interfaces from `lib/types.ts`.
+
+---
+
+## Pre-Commit Checklist
+
+Before pushing:
+
+1. `npm test` — all tests pass
+2. `npm run build` — production build succeeds with no TypeScript errors
+3. `npm run lint` — no lint warnings or errors
+4. Confirm `.env.local` is not staged (`git status`)
+
+---
+
+## Environment Notes
+
+- `lib/sessionOptions.ts` is intentionally separated from `lib/session.ts`: it exports the iron-session config and `SessionData` type without importing `next/headers`. This lets API routes and server components import session config without pulling in Next.js server-only APIs.
+- `app/api/delete/route.ts` has a `60s` Vercel function timeout in `vercel.json`. This is required because sequential deletion with 150ms delays can take up to ~15 seconds for a full 100-repo batch.
+- The `undici` dev dependency is present to polyfill `fetch` in the Jest environment for route tests.
