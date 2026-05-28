@@ -94,6 +94,7 @@ describe('GET /api/auth/callback', () => {
     expect(mockSession.save).toHaveBeenCalled()
     expect(mockSession.accessToken).toBe('gho_tok')
     expect(mockSession.login).toBe('alice')
+    expect(mockSession.avatarUrl).toBe('https://avatars.githubusercontent.com/u/1')
     expect(res.headers.get('location')).toContain('/repos')
   })
 
@@ -107,5 +108,9 @@ describe('GET /api/auth/callback', () => {
 
     const res = await GET(makeRequest({ code: 'good', state: 'valid-state' }))
     expect(res.headers.get('location')).toContain('/repos')
+
+    const setCookie = res.headers.get('set-cookie')
+    expect(setCookie).toContain('depo_oauth_state=')
+    expect(setCookie).toContain('Expires=Thu, 01 Jan 1970 00:00:00 GMT')
   })
 })
