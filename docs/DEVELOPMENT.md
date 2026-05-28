@@ -37,12 +37,17 @@ tests/
 │   ├── types.test.ts           Repo / DeletionResult / SessionData conformance
 │   └── vercelJson.test.ts      vercel.json maxDuration for delete route
 └── integration/
-    └── middleware.test.ts      auth redirect behavior (14 cases)
+    ├── middleware.test.ts       auth redirect behavior (14 cases)
+    └── authCallback.test.ts    OAuth callback: CSRF validation, token exchange, session write (7 cases)
 ```
 
 **Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
 
-**Integration tests** (`tests/integration/`) test cross-cutting behaviour that requires module interaction. `middleware.test.ts` mocks `iron-session` at the module boundary and drives `middleware()` directly with `NextRequest` objects — it does not spin up an HTTP server. The suite covers: authenticated access (no redirect), unauthenticated access (redirect to `/`), corrupted-cookie error path (redirect to `/`), and path-matching precision (e.g., confirming `/repos-test` is not intercepted). The file uses a `@jest-environment node` docblock because Next.js middleware requires Node globals rather than jsdom.
+**Integration tests** (`tests/integration/`) test cross-cutting behaviour that requires module interaction. Neither test spins up an HTTP server — they drive route/middleware handlers directly with `NextRequest` objects. Both use a `@jest-environment node` docblock because Next.js server-side APIs require Node globals rather than jsdom.
+
+`middleware.test.ts` mocks `iron-session` at the module boundary and drives `middleware()` directly. The suite covers: authenticated access (no redirect), unauthenticated access (redirect to `/`), corrupted-cookie error path (redirect to `/`), and path-matching precision (e.g., confirming `/repos-test` is not intercepted).
+
+`authCallback.test.ts` mocks `@/lib/session` and `next/headers` before imports (preventing the `SESSION_SECRET` startup guard in `sessionOptions.ts` from running), and replaces `global.fetch` with a Jest mock for controlled token exchange and user profile responses. The suite covers: all CSRF failure paths (missing/mismatched state, missing code), all token exchange failure paths (error field, missing access_token), and the success path (session written with correct values, redirect to `/repos`, `depo_oauth_state` cookie deleted).
 
 ### Mock Patterns
 
