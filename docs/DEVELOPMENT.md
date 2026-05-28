@@ -38,7 +38,7 @@ tests/
 │   └── vercelJson.test.ts      vercel.json maxDuration for delete route
 └── integration/
     ├── middleware.test.ts       auth redirect behavior (14 cases)
-    └── authCallback.test.ts    OAuth callback: CSRF validation, token exchange, session write (7 cases)
+    └── authCallback.test.ts    OAuth callback: CSRF validation, env vars, network errors, token exchange, session write (9 cases)
 ```
 
 **Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
@@ -47,7 +47,7 @@ tests/
 
 `middleware.test.ts` mocks `iron-session` at the module boundary and drives `middleware()` directly. The suite covers: authenticated access (no redirect), unauthenticated access (redirect to `/`), corrupted-cookie error path (redirect to `/`), and path-matching precision (e.g., confirming `/repos-test` is not intercepted).
 
-`authCallback.test.ts` mocks `@/lib/session` and `next/headers` before imports (preventing the `SESSION_SECRET` startup guard in `sessionOptions.ts` from running), and replaces `global.fetch` with a Jest mock for controlled token exchange and user profile responses. The suite covers: all CSRF failure paths (missing/mismatched state, missing code), all token exchange failure paths (error field, missing access_token), and the success path (session written with correct values, redirect to `/repos`, `depo_oauth_state` cookie deleted).
+`authCallback.test.ts` mocks `@/lib/session` and `next/headers` before imports (preventing the `SESSION_SECRET` startup guard in `sessionOptions.ts` from running), and replaces `global.fetch` with a Jest mock for controlled token exchange and user profile responses. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are stubbed in `beforeEach` and cleaned up in `afterEach` so tests that reach the token exchange path are not blocked by the env var guard. The suite covers: all CSRF failure paths (missing/mismatched state, missing code), the env var guard, token exchange network failure (fetch throws), token exchange response failures (error field, missing access_token), user profile fetch returning a non-OK status, and the full success path — session fields (`accessToken`, `login`, `avatarUrl`) written correctly, redirect to `/repos`, `depo_oauth_state` cookie deleted (verified via the `Set-Cookie` response header).
 
 ### Mock Patterns
 
