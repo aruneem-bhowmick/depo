@@ -81,16 +81,26 @@ Returns the authenticated user's public repositories, sorted by most recently up
 ]
 ```
 
+The response is a bare JSON array (not wrapped in an object). An empty array `[]` is a valid successful response when the user has no public repos.
+
 **Error responses**:
 
-| Status | Condition |
-|--------|-----------|
-| `401` | No valid session |
-| `500` | GitHub API error |
+| Status | Body `error` field | Condition |
+|--------|-------------------|-----------|
+| `401` | `"Not authenticated"` | Session cookie is absent or has no `accessToken` |
+| `401` | `"Session expired. Please sign in again."` | GitHub returned `401` — token was revoked after the session was created |
+| `500` | `"GitHub API error: <message>"` | Any other error from the GitHub API |
+
+**Client handling**:
+- On `401`, redirect to `/?error=session_expired` so the user can re-authenticate.
+- On `500`, display the `error` field to the user. These errors are transient (rate limits, GitHub outages) and the user can retry.
 
 **Implementation notes**:
-- Uses Octokit's `paginate` method to fetch all pages automatically (GitHub returns max 100 per page)
-- Fetches only repos of type `owner` with `visibility: 'public'`, sorted by `updated` descending. `per_page: 100` is passed to minimise round trips — `octokit.paginate` accumulates all pages before returning.
+- Delegates entirely to `listPublicRepos(token)` in `lib/github.ts` — no Octokit instantiation in the route itself.
+- Uses Octokit's `paginate` method to fetch all pages automatically; a user with 300 repos receives all 300 in a single response.
+- Query parameters sent to GitHub: `{ type: 'owner', visibility: 'public', sort: 'updated', direction: 'desc', per_page: 100 }`. The `type: 'owner'` filter excludes repos the user collaborates on but does not own.
+- Distinguishes revoked-token errors from other GitHub errors by checking whether the error message contains `'401'` or `'Unauthorized'`. A revoked token returns `401` to the client so the page can prompt re-authentication rather than showing a generic server error.
+- The GitHub access token is read exclusively from the server-side session cookie and is never echoed in the response.
 
 ---
 

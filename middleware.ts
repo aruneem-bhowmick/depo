@@ -5,6 +5,19 @@ import type { SessionData } from './lib/types'
 
 const PROTECTED = ['/repos', '/confirm', '/done']
 
+/**
+ * Next.js edge middleware that enforces authentication on protected page routes.
+ *
+ * Intercepts all requests to `/repos`, `/confirm`, and `/done` (and any
+ * sub-paths). Reads the `depo_session` cookie via `getIronSession`; redirects
+ * to `/` if no `accessToken` is present or if the cookie cannot be decrypted
+ * (tampered or encrypted with a different secret). All other paths pass through
+ * unmodified.
+ *
+ * @param request - The incoming Next.js edge request.
+ * @returns A redirect to `/` for unauthenticated requests on protected paths,
+ *   or an unmodified pass-through `NextResponse` for everything else.
+ */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
