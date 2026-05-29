@@ -51,7 +51,8 @@ function mapGitHubError(message: string): string {
  *   - `200 { results: DeletionResult[] }` — always returned on completion,
  *     even when individual repos fail. Inspect each result's `status` field.
  *   - `400 { error: string }` — body missing, malformed, `repos` not an array,
- *     empty array, exceeds `MAX_BATCH_SIZE`, or contains non-string entries.
+ *     empty array, exceeds `MAX_BATCH_SIZE`, or contains entries that are not
+ *     non-empty short repo names (e.g. empty strings or `owner/repo` values).
  *   - `401 { error: 'Not authenticated' }` — no valid session cookie.
  */
 export async function POST(request: NextRequest) {
@@ -89,8 +90,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (!repos.every(r => typeof r === 'string')) {
-    return NextResponse.json({ error: 'All entries in repos must be strings' }, { status: 400 })
+  if (!repos.every(r => typeof r === 'string' && r.trim().length > 0 && !r.includes('/'))) {
+    return NextResponse.json(
+      { error: 'All entries in repos must be non-empty short repo names (no owner/ prefix)' },
+      { status: 400 },
+    )
   }
 
   const repoNames = repos as string[]

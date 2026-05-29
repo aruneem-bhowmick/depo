@@ -80,7 +80,21 @@ describe('POST /api/delete', () => {
     const res = await POST(makeRequest({ repos: [1, 2, 3] }))
     expect(res.status).toBe(400)
     const body = await res.json()
-    expect(body.error).toContain('strings')
+    expect(body.error).toContain('short repo names')
+  })
+
+  it('returns 400 when repos contains empty or whitespace-only names', async () => {
+    const res = await POST(makeRequest({ repos: ['ok', '   '] }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('short repo names')
+  })
+
+  it('returns 400 when repos contains owner/-prefixed names', async () => {
+    const res = await POST(makeRequest({ repos: ['alice/repo'] }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('short repo names')
   })
 
   it('calls deleteRepo sequentially for each repo with the session login as owner', async () => {
