@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSession } from '@/lib/session'
 
+/**
+ * GET /api/auth/callback — Completes the GitHub OAuth authorisation flow.
+ *
+ * Validates the CSRF `state` parameter against the `depo_oauth_state` cookie,
+ * exchanges the authorisation `code` for a GitHub access token, fetches the
+ * authenticated user's profile, writes the session cookie, and redirects to
+ * `/repos`.
+ *
+ * All failure paths — CSRF mismatch, missing environment variables, network
+ * errors, bad token exchange response, invalid user profile, or session write
+ * failure — redirect to `/?error=auth_failed` rather than returning a 4xx/5xx
+ * directly, so the user always lands on a recoverable page.
+ *
+ * @param request - Incoming GET request. Expected query params: `code`, `state`.
+ * @returns Redirect to `/repos` on success, or `/?error=auth_failed` on any failure.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const code = searchParams.get('code')
