@@ -39,7 +39,8 @@ tests/
 └── integration/
     ├── middleware.test.ts       auth redirect behavior (14 cases)
     ├── authCallback.test.ts    OAuth callback: CSRF validation, env vars, network errors, token exchange, session write (9 cases)
-    └── apiRepos.test.ts        GET /api/repos: unauthenticated, empty list, repo array, revoked-token 401, GitHub 500 (6 cases)
+    ├── apiRepos.test.ts        GET /api/repos: unauthenticated, empty list, repo array, revoked-token 401, GitHub 500 (6 cases)
+    └── apiDelete.test.ts       POST /api/delete: auth, validation, sequential deletion, partial failure, error mapping (13 cases)
 ```
 
 **Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
@@ -51,6 +52,8 @@ tests/
 `authCallback.test.ts` mocks `@/lib/session` and `next/headers` before imports (preventing the `SESSION_SECRET` startup guard in `sessionOptions.ts` from running), and replaces `global.fetch` with a Jest mock for controlled token exchange and user profile responses. `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are stubbed in `beforeEach` and cleaned up in `afterEach` so tests that reach the token exchange path are not blocked by the env var guard. The suite covers: all CSRF failure paths (missing/mismatched state, missing code), the env var guard, token exchange network failure (fetch throws), token exchange response failures (error field, missing access_token), user profile fetch returning a non-OK status, and the full success path — session fields (`accessToken`, `login`, `avatarUrl`) written correctly, redirect to `/repos`, `depo_oauth_state` cookie deleted (verified via the `Set-Cookie` response header).
 
 `apiRepos.test.ts` mocks `@/lib/session` and `@/lib/github` at the module boundary and calls `GET()` directly. The suite covers: the `401` response when no `accessToken` is present in the session; the `200` response with a correctly shaped `Repo[]` array; that `listPublicRepos` receives exactly the `accessToken` from the session; the `401 Session expired` response when GitHub returns a `401` (revoked token); the `500 GitHub API error` response for all other GitHub errors; and the `200 []` response when the user has no public repos.
+
+`apiDelete.test.ts` mocks `@/lib/session`, `@/lib/github`, and `@/lib/constants` (setting `DELETION_DELAY_MS` to `0` so the suite finishes in under 2 seconds). It calls `POST()` directly with `NextRequest` objects. The suite covers: the `401` response when no `accessToken` is in the session; `400` responses for every invalid body shape (non-JSON, missing `repos` key, empty array, array exceeding `MAX_BATCH_SIZE`, non-string entries); that `deleteRepo` is called once per repo with the correct token and session-derived owner; the `{ results }` response shape for an all-success batch; continued execution after a per-repo failure with the failed entry marked `status: "error"`; explicit error-message mapping for HTTP `403` (scope), `404` (not found), and `429` (rate limit); and strict sequential call ordering verified by insertion into a shared array rather than by time.
 
 ### Mock Patterns
 
