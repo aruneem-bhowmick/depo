@@ -106,7 +106,7 @@ The response is a bare JSON array (not wrapped in an object). An empty array `[]
 
 ## `POST /api/delete`
 
-Deletes a list of repositories sequentially. Uses a 150ms delay between each deletion to respect GitHub's secondary rate limits.
+Deletes a list of repositories sequentially. Uses a mandatory 150ms delay between each deletion to respect GitHub's secondary rate limits.
 
 **Auth required**: Yes (session cookie)
 
@@ -118,7 +118,7 @@ Deletes a list of repositories sequentially. Uses a 150ms delay between each del
 }
 ```
 
-`repos` must be an array of repo name strings (not full names — owner is derived from the session). Maximum 100 items.
+`repos` must be an array of **short repo name strings** (e.g. `"my-project"`, not `"username/my-project"`). The owner is derived from the session login — never parse or pass it in the request. Maximum 100 items per request.
 
 **Success response** (`200`):
 
@@ -126,34 +126,54 @@ Deletes a list of repositories sequentially. Uses a 150ms delay between each del
 {
   "results": [
     { "repo": "repo-name-one", "status": "deleted" },
-    { "repo": "repo-name-two", "status": "error", "error": "Not Found" }
+    { "repo": "repo-name-two", "status": "error", "error": "Repository not found — it may already have been deleted." }
   ]
 }
 ```
 
-Each result has `status: "deleted"` or `status: "error"`. Partial failure is not treated as a total failure — the route always returns `200` with per-repo statuses.
+The response is always wrapped in a `{ results: DeletionResult[] }` object — never a bare array. Each entry in `results` has:
 
-**Error responses**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `repo` | `string` | Short repo name (matches the input) |
+| `status` | `"deleted" \| "error"` | Outcome for this repo |
+| `error` | `string` (optional) | Present only when `status === "error"` |
 
-| Status | Condition |
-|--------|-----------|
-| `400` | Body missing, `repos` is not an array, array is empty, or array exceeds 100 items |
-| `401` | No valid session |
+Partial failure is not treated as a total failure — all repos in the batch are attempted. The route always returns `200` with per-repo statuses when the batch itself is valid.
 
-**GitHub API errors** (captured per-repo as `status: "error"`):
+**Request validation errors** (`400`):
 
-| GitHub HTTP code | Meaning | Error message |
-|-----------------|---------|---------------|
-| `403` | Token lacks `delete_repo` scope | "Token lacks delete_repo scope. Please sign in again." |
-| `404` | Repo not found or already deleted | "Repository not found — it may already have been deleted." |
-| `422` | Cannot be deleted (e.g., last repo in an org) | GitHub's error message verbatim |
-| `429` | Rate limited | "GitHub rate limit reached. Please wait a minute and try again." |
+| Condition | Error message |
+|-----------|--------------|
+| Body is not valid JSON | `"Invalid JSON body"` |
+| Body is not an object or `repos` key is missing | `"Body must be { repos: string[] }"` |
+| `repos` array is empty | `"repos array must not be empty"` |
+| `repos` array exceeds 100 items | `"Cannot delete more than 100 repos at once"` |
+| Any entry in `repos` is not a string | `"All entries in repos must be strings"` |
+
+**Authentication error** (`401`):
+
+| Body `error` field | Condition |
+|-------------------|-----------|
+| `"Not authenticated"` | Session cookie is absent or has no `accessToken` |
+
+**Per-repo GitHub API errors** (returned as `status: "error"` entries within the `200` results array):
+
+| GitHub HTTP code | Meaning | `error` field value |
+|-----------------|---------|---------------------|
+| `403` | Token lacks `delete_repo` scope | `"Token lacks delete_repo scope. Please sign in again."` |
+| `404` | Repo not found or already deleted | `"Repository not found — it may already have been deleted."` |
+| `422` | Cannot be deleted (e.g. last repo in an org) | `"Cannot delete: <GitHub error message>"` |
+| `429` | Secondary rate limit hit | `"GitHub rate limit reached. Please wait a minute and try again."` |
+| Other | Unexpected error | Raw error message from GitHub/Octokit |
 
 **Implementation notes**:
-- Deletions are strictly **sequential** — `Promise.all` is intentionally not used
-- A `150ms` delay (`DELETION_DELAY_MS`) is awaited between each deletion
-- The route has a **60-second Vercel timeout** configured in `vercel.json` to accommodate large batches
-- Repo names are passed to Octokit's typed `repos.delete()` method — they are not shell-interpolated
+- Deletions are strictly **sequential** — `Promise.all` is intentionally not used. GitHub's secondary rate limits penalise concurrent destructive requests.
+- A `150ms` pause (`DELETION_DELAY_MS` from `lib/constants.ts`) is awaited between each deletion. The pause is skipped after the final item.
+- The route has a **60-second Vercel timeout** configured in `vercel.json` to accommodate large batches (100 repos × 150ms ≈ 15 seconds plus GitHub round-trip latency).
+- The owner parameter for every GitHub API call is sourced exclusively from `session.login` — it is never parsed from the repo name or the request body.
+- Repo names are passed to Octokit's typed `repos.delete({ owner, repo })` method — they are never interpolated into shell commands or URL strings by the route handler.
+- A failure for one repo does not abort the remaining repos; all are attempted and all outcomes are reported.
 
 ---
 
