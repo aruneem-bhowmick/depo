@@ -2,6 +2,65 @@
 
 ---
 
+## Server Components (Pages)
+
+These are async React server components rendered in the App Router. They run exclusively on the server and can call `getSession()`, set cookies, and access environment variables directly.
+
+---
+
+### Landing Page (`app/page.tsx`)
+
+**File**: `app/page.tsx`
+
+**Type**: Async server component
+
+The entry point for unauthenticated visitors. Handles the beginning of the OAuth flow.
+
+**Props**:
+
+```ts
+interface HomeProps {
+  searchParams: { error?: string }
+}
+```
+
+**Behavior**:
+
+1. **Authenticated redirect**: Calls `getSession()` server-side. If `session.accessToken` is present the component calls `redirect('/repos')` immediately — authenticated users never see the landing page.
+2. **CSRF state generation**: Generates a 32-character hex nonce via `randomBytes(16)` and writes it to a `depo_oauth_state` cookie (`httpOnly: true`, `sameSite: 'lax'`, `maxAge: 600` seconds). This nonce is consumed and validated by `GET /api/auth/callback`.
+3. **OAuth URL construction**: Builds the GitHub authorize URL with `client_id`, `scope=public_repo,delete_repo`, `redirect_uri`, and the CSRF `state` nonce. The URL is embedded in the `href` of the sign-in anchor.
+4. **Error display**: Reads `searchParams.error`. If it matches `auth_failed` or `session_expired`, renders an inline `role="alert"` box with a human-readable message. Unknown error codes produce no alert (silently ignored).
+
+**Rendered elements**:
+
+| Element | Purpose |
+|---------|---------|
+| `<h1>` | "Delete repos in bulk. Finally." — primary headline |
+| `<p>` | One-paragraph explanation of what Depo does |
+| `<div role="alert">` | Conditional — only shown when `searchParams.error` maps to a known message |
+| `<a href={authUrl}>` | "Sign in with GitHub" link — initiates the OAuth flow |
+| `<p>` (scope note) | Discloses `public_repo` and `delete_repo` scope to the user |
+
+**Error messages**:
+
+| `?error=` value | Message displayed |
+|-----------------|------------------|
+| `auth_failed` | "Sign-in failed. Please try again." |
+| `session_expired` | "Your session expired. Please sign in again." |
+| *(any other value)* | No alert shown |
+
+**Environment variables read at render time**:
+
+| Variable | Used for |
+|----------|---------|
+| `GITHUB_CLIENT_ID` | `client_id` parameter of the OAuth URL |
+| `NEXT_PUBLIC_APP_URL` | Base URL for the `redirect_uri` parameter |
+| `NODE_ENV` | Controls `secure` flag on the `depo_oauth_state` cookie |
+
+**Security note**: The CSRF state nonce is generated server-side with `crypto.randomBytes`, making it cryptographically unpredictable. It is stored as an `httpOnly` cookie (inaccessible to browser JavaScript) and lives for only 10 minutes, limiting the attack window for any stolen nonce.
+
+---
+
 ## React Components
 
 All five components are client components (`'use client'`). They are rendered inside server component page shells that pass data as props.
