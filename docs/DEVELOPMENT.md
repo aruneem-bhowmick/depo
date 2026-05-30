@@ -34,14 +34,18 @@ tests/
 │   ├── session.test.ts         getSession() helper
 │   ├── sessionOptions.test.ts  cookie config properties
 │   ├── smoke.test.ts           basic sanity checks
+│   ├── tailwindConfig.test.ts  darkMode strategy, shake keyframes and animation shorthand (7 cases)
 │   ├── types.test.ts           Repo / DeletionResult / SessionData conformance
 │   └── vercelJson.test.ts      vercel.json maxDuration for delete route
-└── integration/
-    ├── middleware.test.ts       auth redirect behavior (14 cases)
-    ├── authCallback.test.ts    OAuth callback: CSRF validation, env vars, network errors, token exchange, session write (9 cases)
-    ├── apiRepos.test.ts        GET /api/repos: unauthenticated, empty list, repo array, revoked-token 401, GitHub 500 (6 cases)
-    ├── apiDelete.test.ts       POST /api/delete: auth, validation, sequential deletion, partial failure, error mapping (13 cases)
-    └── apiSignout.test.ts      POST /api/signout: session.destroy() call, redirect to /, no-op on empty session, NEXT_PUBLIC_APP_URL fallback (5 cases)
+├── integration/
+│   ├── middleware.test.ts       auth redirect behavior (14 cases)
+│   ├── authCallback.test.ts    OAuth callback: CSRF validation, env vars, network errors, token exchange, session write (9 cases)
+│   ├── apiRepos.test.ts        GET /api/repos: unauthenticated, empty list, repo array, revoked-token 401, GitHub 500 (6 cases)
+│   ├── apiDelete.test.ts       POST /api/delete: auth, validation, sequential deletion, partial failure, error mapping (13 cases)
+│   └── apiSignout.test.ts      POST /api/signout: session.destroy() call, redirect to /, no-op on empty session, NEXT_PUBLIC_APP_URL fallback (5 cases)
+└── components/
+    ├── Layout.test.tsx          Nav bar structure: wordmark link, authenticated user section, unauthenticated state (8 cases)
+    └── SignOutButton.test.tsx   Render, click handler (POST /api/signout), router.push, router.refresh (6 cases)
 ```
 
 **Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
@@ -57,6 +61,12 @@ tests/
 `apiDelete.test.ts` mocks `@/lib/session`, `@/lib/github`, and `@/lib/constants` (setting `DELETION_DELAY_MS` to `0` so the suite finishes in under 2 seconds). It calls `POST()` directly with `NextRequest` objects. The suite covers: the `401` response when no `accessToken` is in the session; `400` responses for every invalid body shape (non-JSON, missing `repos` key, empty array, array exceeding `MAX_BATCH_SIZE`, non-string entries); that `deleteRepo` is called once per repo with the correct token and session-derived owner; the `{ results }` response shape for an all-success batch; continued execution after a per-repo failure with the failed entry marked `status: "error"`; explicit error-message mapping for HTTP `403` (scope), `404` (not found), and `429` (rate limit); and strict sequential call ordering verified by insertion into a shared array rather than by time.
 
 `apiSignout.test.ts` mocks `@/lib/session` at the module boundary and drives `POST()` with `NextRequest` objects constructed by a `makeRequest()` helper (the route accepts a request so it can derive a fallback redirect base from `request.url`). `NEXT_PUBLIC_APP_URL` is set to `'http://localhost:3000'` in `beforeEach` and deleted in `afterEach` to keep tests hermetic. The suite covers: that `session.destroy()` is called exactly once; that the response is a `307` redirect to `http://localhost:3000/`; that the route completes without error when given an already-empty session object (no-op destroy); that the route redirects to the request origin when `NEXT_PUBLIC_APP_URL` is absent; and that the same fallback fires when the env var is set to an invalid URL string.
+
+**Component tests** (`tests/components/`) use React Testing Library with the `jsdom` environment (default). They test interactive client components that depend on React hooks and the DOM.
+
+`SignOutButton.test.tsx` mocks `next/navigation` (providing `useRouter` with `push` and `refresh` stubs) and `global.fetch`. The suite covers: button render and label text; that clicking fires `POST /api/signout` exactly once; that `router.push('/')` is called after fetch resolves; that `router.refresh()` is called; and that the focus-ring classes are present for keyboard accessibility.
+
+`Layout.test.tsx` exercises the nav bar's structural contract via an inline `Nav` component (the real `RootLayout` is an async server component that requires `next/headers` and cannot be driven by Jest directly). The suite covers: the Depo wordmark link pointing to `/`; login name visibility when authenticated vs. unauthenticated; sign-out button visibility; GitHub avatar rendering when `avatarUrl` is provided vs. omitted; and that the unauthenticated state renders no user-section elements.
 
 ### Mock Patterns
 

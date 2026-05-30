@@ -103,6 +103,19 @@ Client-side state that must persist across page navigations is stored in `sessio
 
 ---
 
+## Global Layout
+
+`app/layout.tsx` is the root server component that wraps every page. It:
+
+- Loads the **Inter** font via `next/font/google` and applies it to `<body>` so the typeface is self-hosted (no third-party font request at runtime).
+- Inlines a **dark-mode initialisation script** synchronously in `<head>`. The script checks `window.matchMedia('(prefers-color-scheme: dark)')` and adds the `dark` class to `<html>` before the first paint, preventing a flash of unstyled content. `suppressHydrationWarning` is set on `<html>` to suppress the React hydration warning that would otherwise appear because the class is added by a non-React script.
+- Calls `getSession()` server-side and renders a **navigation bar** with the Depo wordmark (left) and — when `session.accessToken` is present — the user's GitHub avatar (24×24 circle), login name, and `<SignOutButton />` (right).
+- Wraps page content in `<main className="max-w-2xl mx-auto px-4 py-8">` — the same `max-w-2xl` constraint used by the header inner div ensures consistent narrow-width layout on all pages.
+
+**Dark mode strategy**: `darkMode: 'class'` in `config/tailwind.config.ts`. Tailwind generates dark-variant utilities (`dark:bg-zinc-950`, `dark:text-zinc-100`, etc.) that activate when `<html>` has the `dark` class. The class is set by the inline script on load and never toggled at runtime — theme follows OS preference.
+
+---
+
 ## Tech Stack
 
 | Package | Version | Purpose |
@@ -111,7 +124,7 @@ Client-side state that must persist across page navigations is stored in `sessio
 | `react` / `react-dom` | 18 | UI rendering |
 | `iron-session` | 8 | Encrypted HTTP-only session cookies |
 | `@octokit/rest` | 22 | GitHub REST API client with pagination |
-| `tailwindcss` | 3 | Utility-first CSS |
+| `tailwindcss` | 3 | Utility-first CSS with `class`-based dark mode and custom `shake` animation |
 | `typescript` | 5 | Static typing throughout |
 
 ---
@@ -155,3 +168,9 @@ depo/
 ```
 
 **`next.config.ts`**: written in TypeScript (not `.mjs`). Configured with `images.domains: ['avatars.githubusercontent.com']` to allow Next.js image optimization for GitHub user avatars.
+
+**`config/tailwind.config.ts`**: Tailwind configuration. Key settings:
+- `darkMode: 'class'` — dark mode is toggled by the `dark` class on `<html>`, set by the inline layout script.
+- `content` scans `./app/**/*.{ts,tsx}` and `./components/**/*.{ts,tsx}`.
+- Custom `shake` keyframe animation (0.4s, `ease-in-out`) used by `ConfirmGate` when a wrong count is submitted.
+- Loaded by `postcss.config.js` via `tailwindcss: { config: './config/tailwind.config.ts' }`.
