@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 
 /**
@@ -13,21 +13,23 @@ import { getSession } from '@/lib/session'
  *
  * The redirect target is built from `NEXT_PUBLIC_APP_URL` when that variable is
  * present and contains a valid URL. If it is absent or malformed, the route falls
- * back to the relative path `'/'`, which is always safe regardless of deployment
- * environment. The try/catch around `new URL()` is necessary because the
- * constructor throws a `TypeError` when given `undefined` or an invalid string.
+ * back to deriving the root from the incoming `request.url`, which is always an
+ * absolute URL and therefore always a valid base. `NextResponse.redirect()` in
+ * Next.js 14 requires an absolute URL and rejects relative paths, so both paths
+ * through this function always produce an absolute target.
  *
- * @returns A `307` redirect to `NEXT_PUBLIC_APP_URL + '/'`, or `'/'` when that
- *   env var is absent or invalid.
+ * @param request - The incoming POST request; used as the base URL fallback.
+ * @returns A `307` redirect to `NEXT_PUBLIC_APP_URL + '/'`, or to the origin of
+ *   the request URL when that env var is absent or invalid.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   const session = await getSession()
   session.destroy()
   let target: string
   try {
     target = new URL('/', process.env.NEXT_PUBLIC_APP_URL).toString()
   } catch {
-    target = '/'
+    target = new URL('/', request.url).toString()
   }
   return NextResponse.redirect(target)
 }
