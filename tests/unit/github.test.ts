@@ -24,7 +24,7 @@ const mockOctokit = {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  ;(Octokit as jest.Mock).mockImplementation(() => mockOctokit)
+  ;(Octokit as unknown as jest.Mock).mockImplementation(() => mockOctokit)
 })
 
 describe('createOctokit()', () => {

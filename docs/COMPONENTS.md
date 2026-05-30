@@ -124,7 +124,7 @@ interface ConfirmGateProps {
 - Label reads "Type {count} to confirm"
 - The delete button is `disabled` and `opacity-50 cursor-not-allowed` when `!confirmed`
 - When confirmed, the button turns red (`bg-red-600`)
-- Clicking the button while `!confirmed` triggers a 400ms shake animation (CSS keyframes defined in `tailwind.config.ts`) and does nothing else
+- Clicking the button while `!confirmed` triggers a 400ms shake animation (CSS keyframes defined in `config/tailwind.config.ts` as `animate-shake`) and does nothing else
 - When `loading === true`, the button shows a spinner instead of text
 
 ---
@@ -133,9 +133,24 @@ interface ConfirmGateProps {
 
 **File**: `components/SignOutButton.tsx`
 
-A simple button that signs the user out.
+Client component rendered in the root layout's navigation bar when the user is authenticated. Provides a one-click sign-out action.
 
-**Behavior**: `POST /api/signout` via `fetch`, then `router.push('/')` on success.
+**Props**: none
+
+**Behavior**:
+1. Sends `POST /api/signout` via `fetch`. The route destroys the `depo_session` cookie server-side.
+2. Checks `response.ok`. If the response is successful, calls `router.push('/')` to navigate to the landing page, then `router.refresh()` so the server layout re-renders without session data (hiding the nav user section immediately without a full reload).
+3. If the fetch throws (network error) or the response is non-2xx, navigation is suppressed. The error is logged to the console (`[SignOutButton]` prefix) and a brief inline error message appears in a `<span role="alert">` adjacent to the button, leaving the user on the current page.
+
+No authentication check is performed before the fetch — calling sign-out while already signed out is a no-op and safe.
+
+**State**:
+
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `error` | `string \| null` | `null` | Error message shown inline on fetch failure; reset to `null` at the start of each click |
+
+**Styling**: `text-sm`, hover colour change, `focus:ring-2 focus:ring-violet-500` focus ring for keyboard accessibility. The error message uses `text-xs text-red-500` and is only rendered when non-null.
 
 ---
 
