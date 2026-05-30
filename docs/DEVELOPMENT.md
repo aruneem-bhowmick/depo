@@ -45,7 +45,7 @@ tests/
 │   └── apiSignout.test.ts      POST /api/signout: session.destroy() call, redirect to /, no-op on empty session, NEXT_PUBLIC_APP_URL fallback (5 cases)
 └── components/
     ├── Layout.test.tsx          Nav bar structure: wordmark link, authenticated user section, unauthenticated state (8 cases)
-    └── SignOutButton.test.tsx   Render, click handler (POST /api/signout), router.push, router.refresh (6 cases)
+    └── SignOutButton.test.tsx   Render, click handler, success navigation, non-2xx error path, network error path (15 cases)
 ```
 
 **Jest configuration**: `config/jest.config.ts` — rootDir `../`, jsdom environment, ts-jest transform, setup file at `config/jest.setup.ts` (imports `@testing-library/jest-dom`).
@@ -64,7 +64,7 @@ tests/
 
 **Component tests** (`tests/components/`) use React Testing Library with the `jsdom` environment (default). They test interactive client components that depend on React hooks and the DOM.
 
-`SignOutButton.test.tsx` mocks `next/navigation` (providing `useRouter` with `push` and `refresh` stubs) and `global.fetch`. The suite covers: button render and label text; that clicking fires `POST /api/signout` exactly once; that `router.push('/')` is called after fetch resolves; that `router.refresh()` is called; and that the focus-ring classes are present for keyboard accessibility.
+`SignOutButton.test.tsx` mocks `next/navigation` (providing `useRouter` with `push` and `refresh` stubs), spies on `console.error`, and sets `global.fetch` per describe block. The suite is split into three groups: **success path** (7 cases) — button render, `POST /api/signout` is called, fetch fires exactly once, `router.push('/')` is called, `router.refresh()` is called, focus-ring classes are present, no error alert is shown; **non-2xx failure** (4 cases) — navigation is suppressed when `response.ok` is false, `router.refresh()` is not called, an error `<span role="alert">` appears containing the HTTP status, `console.error` is called with the `[SignOutButton]` prefix; **network error** (4 cases) — same navigation-suppression and alert checks when `fetch` rejects entirely.
 
 `Layout.test.tsx` exercises the nav bar's structural contract via an inline `Nav` component (the real `RootLayout` is an async server component that requires `next/headers` and cannot be driven by Jest directly). The suite covers: the Depo wordmark link pointing to `/`; login name visibility when authenticated vs. unauthenticated; sign-out button visibility; GitHub avatar rendering when `avatarUrl` is provided vs. omitted; and that the unauthenticated state renders no user-section elements.
 

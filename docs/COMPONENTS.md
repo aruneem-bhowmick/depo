@@ -139,12 +139,18 @@ Client component rendered in the root layout's navigation bar when the user is a
 
 **Behavior**:
 1. Sends `POST /api/signout` via `fetch`. The route destroys the `depo_session` cookie server-side.
-2. Calls `router.push('/')` to navigate to the landing page.
-3. Calls `router.refresh()` so the server layout re-renders without session data, hiding the nav user section immediately without a full reload.
+2. Checks `response.ok`. If the response is successful, calls `router.push('/')` to navigate to the landing page, then `router.refresh()` so the server layout re-renders without session data (hiding the nav user section immediately without a full reload).
+3. If the fetch throws (network error) or the response is non-2xx, navigation is suppressed. The error is logged to the console (`[SignOutButton]` prefix) and a brief inline error message appears in a `<span role="alert">` adjacent to the button, leaving the user on the current page.
 
 No authentication check is performed before the fetch — calling sign-out while already signed out is a no-op and safe.
 
-**Styling**: `text-sm`, hover colour change, `focus:ring-2 focus:ring-violet-500` focus ring for keyboard accessibility.
+**State**:
+
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `error` | `string \| null` | `null` | Error message shown inline on fetch failure; reset to `null` at the start of each click |
+
+**Styling**: `text-sm`, hover colour change, `focus:ring-2 focus:ring-violet-500` focus ring for keyboard accessibility. The error message uses `text-xs text-red-500` and is only rendered when non-null.
 
 ---
 
