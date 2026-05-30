@@ -1,6 +1,4 @@
 import { redirect } from 'next/navigation'
-import { randomBytes } from 'crypto'
-import { cookies } from 'next/headers'
 import { getSession } from '@/lib/session'
 
 interface HomeProps {
@@ -21,17 +19,17 @@ const ERROR_MESSAGES: Record<string, string> = {
  *
  * Authenticated users are immediately redirected to `/repos` without seeing
  * this page. For unauthenticated visitors, renders the marketing headline,
- * a one-paragraph explanation, a "Sign in with GitHub" OAuth link, and a
- * disclosure note about the requested scopes.
+ * a one-paragraph explanation, a "Sign in with GitHub" link, and a disclosure
+ * note about the requested OAuth scopes.
  *
- * Before rendering, generates a cryptographically-random CSRF state nonce
- * using `randomBytes(16)` and stores it as a short-lived `httpOnly`
- * `depo_oauth_state` cookie. The same nonce is embedded in the OAuth URL
- * `state` query parameter so the callback route can verify that the
- * authorization was initiated by this server and not injected by a third party.
+ * The sign-in link points to `GET /api/auth/login` rather than directly to
+ * GitHub. That Route Handler generates the CSRF state nonce, writes the
+ * `depo_oauth_state` cookie, and issues the redirect to GitHub. This
+ * separation is required because Next.js only permits cookie mutation in
+ * Route Handlers and Server Actions — not in Server Component render functions.
  *
  * When `?error=auth_failed` or `?error=session_expired` appears in the URL,
- * an inline `role="alert"` box is displayed above the sign-in button.
+ * an inline `role="alert"` box is displayed above the sign-in link.
  * Unrecognised `?error` values are silently ignored.
  *
  * @param searchParams - Query parameters parsed from the incoming request URL.
@@ -43,25 +41,6 @@ export default async function Home({ searchParams }: HomeProps) {
   if (session.accessToken) {
     redirect('/repos')
   }
-
-  const state = randomBytes(16).toString('hex')
-  const cookieStore = cookies()
-  cookieStore.set('depo_oauth_state', state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 10,
-    path: '/',
-  })
-
-  const authUrl = new URL('https://github.com/login/oauth/authorize')
-  authUrl.searchParams.set('client_id', process.env.GITHUB_CLIENT_ID!)
-  authUrl.searchParams.set('scope', 'public_repo,delete_repo')
-  authUrl.searchParams.set(
-    'redirect_uri',
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`,
-  )
-  authUrl.searchParams.set('state', state)
 
   const errorMessage = searchParams.error ? ERROR_MESSAGES[searchParams.error] ?? null : null
 
@@ -89,7 +68,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
       <div className="flex flex-col gap-3">
         <a
-          href={authUrl.toString()}
+          href="/api/auth/login"
           className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-5 py-2.5 text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-300 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 w-fit"
         >
           <svg
