@@ -34,13 +34,16 @@ The OAuth flow uses the `state` parameter (required by [RFC 6749 §10.12](https:
 
 ### Mechanism
 
-1. When the landing page (`app/page.tsx`) is served to an unauthenticated visitor, it generates a 16-byte cryptographically random nonce using Node.js `crypto.randomBytes(16)` and encodes it as a 32-character hex string.
-2. The nonce is written server-side to a `depo_oauth_state` cookie with these attributes: `httpOnly: true`, `sameSite: 'lax'`, `secure: true` (production only), `maxAge: 600` (10 minutes), `path: '/'`.
-3. The same nonce is embedded as the `state` query parameter in the GitHub OAuth authorize URL rendered in the sign-in link.
-4. When the user clicks "Sign in with GitHub", the browser navigates to GitHub carrying both the cookie and the `state` in the URL. GitHub appends `state` to its callback redirect unchanged.
-5. `GET /api/auth/callback` reads `state` from the query string and compares it to `cookies().get('depo_oauth_state')`. This check runs **before any network call** to GitHub.
-6. If the values are absent or do not match, the route redirects to `/?error=auth_failed`. No token exchange is attempted.
-7. On successful validation and session write, the `depo_oauth_state` cookie is explicitly deleted by setting it on the redirect response to `/repos`.
+1. The landing page (`app/page.tsx`) renders a "Sign in with GitHub" link pointing to `GET /api/auth/login` — not directly to GitHub. No state is generated during page render.
+2. When the user clicks the link, the browser sends `GET /api/auth/login`. That Route Handler generates a 16-byte cryptographically random nonce using `crypto.randomBytes(16)` and encodes it as a 32-character hex string.
+3. The nonce is written to a `depo_oauth_state` cookie on the redirect response, with these attributes: `httpOnly: true`, `sameSite: 'lax'`, `secure: true` (production only), `maxAge: 600` (10 minutes), `path: '/'`.
+4. The same nonce is embedded as the `state` query parameter in the GitHub OAuth authorize URL, and the handler returns a `307` redirect to GitHub.
+5. The browser navigates to GitHub carrying both the `depo_oauth_state` cookie and the `state` value in the URL. GitHub appends `state` to its callback redirect unchanged.
+6. `GET /api/auth/callback` reads `state` from the query string and compares it to `cookies().get('depo_oauth_state')`. This check runs **before any network call** to GitHub.
+7. If the values are absent or do not match, the callback redirects to `/?error=auth_failed`. No token exchange is attempted.
+8. On successful validation and session write, the `depo_oauth_state` cookie is explicitly deleted by setting it on the redirect response to `/repos`.
+
+> **Why a Route Handler and not the Server Component?** Next.js only permits cookie mutation in Route Handlers and Server Actions — not during Server Component render. Attempting `cookies().set()` in a Server Component render function throws at runtime. `GET /api/auth/login` exists specifically to satisfy this constraint.
 
 ### Security properties
 
@@ -48,8 +51,9 @@ The OAuth flow uses the `state` parameter (required by [RFC 6749 §10.12](https:
 - **httpOnly storage**: The nonce cookie is inaccessible to browser JavaScript (`document.cookie`). XSS cannot steal the nonce to forge a valid callback request.
 - **Short expiry**: The 10-minute `maxAge` limits the window during which a leaked nonce could be exploited.
 - **Immediate deletion on success**: The nonce is single-use; the cookie is deleted as soon as it is validated, preventing replay.
+- **Fail-fast env var validation**: `GET /api/auth/login` checks for `GITHUB_CLIENT_ID` and `NEXT_PUBLIC_APP_URL` before generating a nonce. A misconfigured deployment redirects to `/?error=auth_failed` immediately with a `console.error` log rather than embedding `"undefined"` in the authorize URL.
 
-This design ensures that only the browser instance that rendered the landing page can complete the OAuth flow for that particular sign-in attempt.
+This design ensures that only the browser instance that initiated the sign-in request can complete the OAuth flow for that particular attempt.
 
 ---
 
