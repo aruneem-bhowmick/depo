@@ -185,7 +185,7 @@ Destroys the session cookie and redirects to the landing page.
 
 **Request**: No body or query parameters.
 
-**Response**: `307` redirect to `NEXT_PUBLIC_APP_URL + '/'`.
+**Response**: `307` redirect to `NEXT_PUBLIC_APP_URL + '/'`. Falls back to the origin of the incoming request URL if `NEXT_PUBLIC_APP_URL` is absent or not a valid URL string.
 
 **Side effects**:
 
@@ -196,5 +196,5 @@ Destroys the session cookie and redirects to the landing page.
 **Implementation notes**:
 
 - `session.destroy()` is synchronous in iron-session v8 — it is **not** awaited.
-- The redirect uses the absolute URL `process.env.NEXT_PUBLIC_APP_URL + '/'` rather than a relative `/` path, so the redirect works correctly both in local development and behind a custom production base URL.
+- The redirect target is constructed via `new URL('/', process.env.NEXT_PUBLIC_APP_URL)`. If that env var is absent or malformed, the `URL` constructor throws a `TypeError`; the route catches this and derives the root from `request.url` instead. `NextResponse.redirect()` in Next.js 14 requires an absolute URL and rejects relative paths, so both code paths always produce a fully-qualified target.
 - Only `POST` is exported — a browser `GET` to `/api/signout` returns `405 Method Not Allowed` (Next.js default). The `SignOutButton` component calls this route via `fetch('/api/signout', { method: 'POST' })`, not via a form submission or anchor link.
