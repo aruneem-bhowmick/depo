@@ -1,27 +1,34 @@
 import config from '@/config/tailwind.config'
 
+// Tailwind's ResolvableTo types are too generic for direct property access,
+// so we cast through unknown to reach the concrete shapes we know at runtime.
+type KeyframeMap = Record<string, { transform: string }>
+type AnimationMap = Record<string, string>
+
 describe('tailwind.config', () => {
   it('uses class-based dark mode', () => {
     expect(config.darkMode).toBe('class')
   })
 
   it('defines the shake keyframes animation', () => {
-    expect(config.theme?.extend?.keyframes?.shake).toBeDefined()
+    const keyframes = config.theme?.extend?.keyframes as unknown as Record<string, KeyframeMap>
+    expect(keyframes?.shake).toBeDefined()
   })
 
   it('defines the shake animation shorthand', () => {
-    expect(config.theme?.extend?.animation?.shake).toContain('shake')
+    const animation = config.theme?.extend?.animation as unknown as AnimationMap
+    expect(animation?.shake).toContain('shake')
   })
 
   it('shake keyframes cover 0% and 100% reset positions', () => {
-    const shake = config.theme?.extend?.keyframes?.shake as Record<string, { transform: string }>
-    expect(shake['0%, 100%'].transform).toBe('translateX(0)')
+    const keyframes = config.theme?.extend?.keyframes as unknown as Record<string, KeyframeMap>
+    expect(keyframes.shake['0%, 100%'].transform).toBe('translateX(0)')
   })
 
   it('shake keyframes include left and right offsets', () => {
-    const shake = config.theme?.extend?.keyframes?.shake as Record<string, { transform: string }>
-    expect(shake['20%, 60%'].transform).toContain('-6px')
-    expect(shake['40%, 80%'].transform).toContain('6px')
+    const keyframes = config.theme?.extend?.keyframes as unknown as Record<string, KeyframeMap>
+    expect(keyframes.shake['20%, 60%'].transform).toContain('-6px')
+    expect(keyframes.shake['40%, 80%'].transform).toContain('6px')
   })
 
   it('includes app and components directories in content paths', () => {
