@@ -1,6 +1,6 @@
 # Architecture
 
-Depo is a Next.js 14 App Router application deployed as serverless functions on Vercel. It has no database — all state is held in an encrypted session cookie and the browser's `sessionStorage`.
+Depo is a Next.js 14 App Router application deployed as serverless functions on Vercel. It has no database — all state is held in an encrypted session cookie, a short-lived CSRF cookie, and the browser's `sessionStorage`.
 
 ---
 
@@ -9,11 +9,23 @@ Depo is a Next.js 14 App Router application deployed as serverless functions on 
 ```
 User
  │
- ├── GET /                    Landing page — sign-in button
+ ├── GET /                    Landing page — renders sign-in UI
+ │        │                   Authenticated users are immediately redirected to /repos
  │        │
- │        └── GitHub OAuth ──► GET /api/auth/callback
- │                                      │
- │                                      └── Sets session cookie, redirects ──►
+ │        └── (clicks "Sign in") ──► GET /api/auth/login
+ │                                         │
+ │                                         ├── Generates CSRF nonce
+ │                                         ├── Sets depo_oauth_state cookie
+ │                                         └── 307 redirect ──► GitHub OAuth
+ │                                                                    │
+ │                                          (GitHub redirects back) ──┘
+ │                                                 │
+ │                                          GET /api/auth/callback
+ │                                                 │
+ │                                                 ├── Validates state (CSRF check)
+ │                                                 ├── Exchanges code for token
+ │                                                 ├── Writes session cookie
+ │                                                 └── Deletes depo_oauth_state, redirects ──►
  │
  ├── GET /repos  ──► middleware: validate depo_session cookie
  │        │              │
@@ -39,7 +51,7 @@ User
 
 | Route | Rendering | Purpose |
 |-------|-----------|---------|
-| `/` | Server component | Landing page, OAuth sign-in entry point |
+| `/` | Async server component | Landing page: redirects authenticated users to `/repos`; for unauthenticated visitors, renders the sign-in UI — CSRF nonce generation and cookie writing happen in `GET /api/auth/login` when the user clicks the sign-in link |
 | `/repos` | Server shell + client `<RepoList>` | Fetch repos, multi-select, navigate to confirm |
 | `/confirm` | Client component | Review selection, choose output mode, trigger deletion |
 | `/done` | Client component | Display deletion results, offer sign-out or delete more |
@@ -52,6 +64,7 @@ The server/client split is intentional: pages that need `sessionStorage` or inte
 
 | Method | Route | Auth | Purpose |
 |--------|-------|------|---------|
+| `GET` | `/api/auth/login` | None | Generate CSRF nonce, set `depo_oauth_state` cookie, redirect to GitHub OAuth |
 | `GET` | `/api/auth/callback` | None | Exchange GitHub OAuth code for access token, set session |
 | `GET` | `/api/repos` | Session cookie | Return authenticated user's public repos |
 | `POST` | `/api/delete` | Session cookie | Sequentially delete selected repos with rate-limit delay |
@@ -93,13 +106,22 @@ The GitHub access token lives exclusively inside this cookie and is read server-
 
 ## State Between Pages
 
-Client-side state that must persist across page navigations is stored in `sessionStorage` under these keys:
+Cross-page state is stored in two different mechanisms depending on its security requirements:
 
-| Key | Type | Set by | Read by | Cleared by |
-|-----|------|--------|---------|------------|
+### sessionStorage (client-side, tab-scoped)
+
+| Key (`lib/constants.ts`) | Type | Set by | Read by | Cleared by |
+|--------------------------|------|--------|---------|------------|
 | `depo:selected` | `string[]` (repo names) | `/repos` "Continue" button | `/confirm` on mount | `/done` on mount |
 | `depo:results` | `DeletionResult[]` | `/confirm` after deletion | `/done` on mount | `/done` on mount |
-| `depo:oauth_state` | `string` (CSRF nonce) | Landing page before OAuth redirect | `/api/auth/callback` cookie | Callback route on validation |
+
+### HTTP Cookie (server-side, httpOnly)
+
+| Cookie name | Type | Set by | Read by | Cleared by |
+|-------------|------|--------|---------|------------|
+| `depo_oauth_state` | `string` (hex CSRF nonce) | Landing page (`app/page.tsx`) via `cookies().set()` | `GET /api/auth/callback` via `cookies().get()` | Callback route on successful validation, via `response.cookies.delete()` |
+
+> **Why a cookie and not sessionStorage for the OAuth state?** The CSRF nonce must survive a cross-origin navigation (browser → GitHub → back to the app). `sessionStorage` is not accessible from the callback URL during a redirect, so the nonce is stored as an `httpOnly` server-readable cookie instead. `httpOnly` prevents client-side JavaScript from reading or tampering with the nonce.
 
 ---
 

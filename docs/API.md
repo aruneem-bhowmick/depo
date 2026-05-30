@@ -1,6 +1,6 @@
 # API Reference
 
-Depo exposes four serverless API routes. All routes run server-side and access the GitHub token exclusively via the encrypted session cookie — the token is never returned to the client.
+Depo exposes five serverless API routes. All routes run server-side and access the GitHub token exclusively via the encrypted session cookie — the token is never returned to the client.
 
 ---
 
@@ -9,6 +9,33 @@ Depo exposes four serverless API routes. All routes run server-side and access t
 Protected routes require a valid session cookie (`depo_session`). If the session is missing or the token has been revoked, the route returns `401`. Client code should redirect to `/?error=session_expired` on receiving a `401` from any protected route.
 
 **Note on page routes vs. API routes**: requests to `/repos`, `/confirm`, and `/done` are intercepted by Next.js middleware *before* any server component runs. Unauthenticated page requests receive a `307` redirect to `/` and never invoke an API route. The `401` behaviour described below applies specifically to direct calls to `/api/repos` and `/api/delete`.
+
+---
+
+## `GET /api/auth/login`
+
+Initiates the GitHub OAuth authorisation flow. Generates a CSRF state nonce, stores it as a short-lived `httpOnly` cookie, and redirects the browser to the GitHub OAuth authorize endpoint.
+
+**Auth required**: No
+
+**Request**: No body or query parameters.
+
+**Success response**: `307` redirect to `https://github.com/login/oauth/authorize` with query parameters:
+
+| Parameter | Value |
+|-----------|-------|
+| `client_id` | `GITHUB_CLIENT_ID` environment variable |
+| `scope` | `public_repo,delete_repo` |
+| `redirect_uri` | `NEXT_PUBLIC_APP_URL + /api/auth/callback` |
+| `state` | 32-character hex CSRF nonce from `crypto.randomBytes(16)` |
+
+**Side effects**: Sets a `depo_oauth_state` cookie on the redirect response with `httpOnly: true`, `sameSite: 'lax'`, `secure: true` (production only), `maxAge: 600` (10 minutes), `path: '/'`.
+
+**Failure response**: `307` redirect to `/?error=auth_failed` (with a `console.error` log) when `GITHUB_CLIENT_ID` or `NEXT_PUBLIC_APP_URL` are absent. The route never returns `4xx`/`5xx` directly.
+
+**Implementation notes**:
+- This Route Handler exists specifically because Next.js only permits cookie mutation in Route Handlers and Server Actions — not during Server Component render. The landing page links to `/api/auth/login` instead of directly to GitHub for this reason.
+- Only `GET` is exported — other HTTP methods return `405 Method Not Allowed`.
 
 ---
 

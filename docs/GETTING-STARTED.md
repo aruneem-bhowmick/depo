@@ -75,7 +75,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000). Sign in with GitHub to test the full OAuth flow.
+Visit [http://localhost:3000](http://localhost:3000). You will see the Depo landing page with a "Sign in with GitHub" button.
+
+**How the sign-in flow works**:
+1. The server generates a random CSRF nonce, stores it in an `httpOnly` `depo_oauth_state` cookie, and renders the OAuth URL containing the same nonce as `state`.
+2. Clicking "Sign in with GitHub" navigates to GitHub, which asks you to authorise the `public_repo` and `delete_repo` scopes.
+3. GitHub redirects back to `http://localhost:3000/api/auth/callback` with a `code` and the `state` you sent.
+4. The callback validates `state` against the `depo_oauth_state` cookie, exchanges `code` for an access token, writes the session, and redirects to `/repos`.
+
+If anything goes wrong (state mismatch, bad code, network error), you are redirected to `/?error=auth_failed` and shown an inline error message. You can simply click "Sign in with GitHub" again to restart the flow.
 
 ---
 
