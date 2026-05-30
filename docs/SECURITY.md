@@ -30,15 +30,26 @@ A deployment that starts without `SESSION_SECRET` set will crash before serving 
 
 ## CSRF Protection on OAuth Callback
 
-The OAuth flow uses a state parameter to prevent [CSRF attacks on the authorization callback](https://datatracker.ietf.org/doc/html/rfc6749#section-10.12):
+The OAuth flow uses the `state` parameter (required by [RFC 6749 §10.12](https://datatracker.ietf.org/doc/html/rfc6749#section-10.12)) to prevent cross-site request forgery on the authorization callback.
 
-1. Before redirecting to GitHub, the landing page generates a random nonce and stores it in a short-lived `depo_oauth_state` cookie.
-2. The nonce is also passed as the `state` query parameter in the GitHub OAuth authorize URL.
-3. When GitHub redirects back to `/api/auth/callback`, the route reads `state` from the query string and compares it to the `depo_oauth_state` cookie. This check runs **before any network call** — the token exchange is never attempted if the state is invalid.
-4. If the values are missing or don't match, the callback redirects to `/?error=auth_failed` and discards the code — no token exchange occurs.
-5. On successful validation and session write, the `depo_oauth_state` cookie is deleted via a `Set-Cookie` header on the redirect response to `/repos`.
+### Mechanism
 
-This ensures that only the browser that initiated the sign-in flow can complete it.
+1. When the landing page (`app/page.tsx`) is served to an unauthenticated visitor, it generates a 16-byte cryptographically random nonce using Node.js `crypto.randomBytes(16)` and encodes it as a 32-character hex string.
+2. The nonce is written server-side to a `depo_oauth_state` cookie with these attributes: `httpOnly: true`, `sameSite: 'lax'`, `secure: true` (production only), `maxAge: 600` (10 minutes), `path: '/'`.
+3. The same nonce is embedded as the `state` query parameter in the GitHub OAuth authorize URL rendered in the sign-in link.
+4. When the user clicks "Sign in with GitHub", the browser navigates to GitHub carrying both the cookie and the `state` in the URL. GitHub appends `state` to its callback redirect unchanged.
+5. `GET /api/auth/callback` reads `state` from the query string and compares it to `cookies().get('depo_oauth_state')`. This check runs **before any network call** to GitHub.
+6. If the values are absent or do not match, the route redirects to `/?error=auth_failed`. No token exchange is attempted.
+7. On successful validation and session write, the `depo_oauth_state` cookie is explicitly deleted by setting it on the redirect response to `/repos`.
+
+### Security properties
+
+- **Server-generated nonce**: `randomBytes(16)` is cryptographically unpredictable. An attacker cannot pre-compute or guess a valid nonce.
+- **httpOnly storage**: The nonce cookie is inaccessible to browser JavaScript (`document.cookie`). XSS cannot steal the nonce to forge a valid callback request.
+- **Short expiry**: The 10-minute `maxAge` limits the window during which a leaked nonce could be exploited.
+- **Immediate deletion on success**: The nonce is single-use; the cookie is deleted as soon as it is validated, preventing replay.
+
+This design ensures that only the browser instance that rendered the landing page can complete the OAuth flow for that particular sign-in attempt.
 
 ---
 
@@ -113,3 +124,20 @@ If a session expires or the user revokes Depo's OAuth access on GitHub:
 - The landing page detects this query parameter and displays: "Your session expired. Please sign in again."
 
 Users can also revoke access at any time via **GitHub → Settings → Applications → Authorized OAuth Apps**.
+
+---
+
+## Landing Page Error Display
+
+The landing page (`app/page.tsx`) is the designated recovery point for all failure paths in the OAuth flow. All API routes and the OAuth callback redirect to `/` (with an `?error=` query parameter) rather than returning `4xx`/`5xx` responses directly, so users always land on a page that can display a meaningful recovery message.
+
+**Recognised error codes**:
+
+| `?error=` | Trigger | Message shown |
+|-----------|---------|--------------|
+| `auth_failed` | CSRF mismatch, bad code, token exchange failure, missing env vars, user profile fetch failure, session save failure | "Sign-in failed. Please try again." |
+| `session_expired` | GitHub returns `401` on a subsequent API call (expired or revoked token) | "Your session expired. Please sign in again." |
+
+**Unknown error values** (e.g. a manually crafted URL) produce no alert — the `ERROR_MESSAGES` map returns `undefined` for unrecognised keys, which the component treats as `null` and renders nothing. This prevents reflected error text from being used as a vector to display arbitrary content in the UI.
+
+**No PII in error codes**: the `?error=` parameter contains only a short, fixed string. No GitHub error messages, HTTP status codes, or internal details are reflected into the URL or the displayed message.
