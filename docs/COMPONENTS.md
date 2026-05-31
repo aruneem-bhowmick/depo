@@ -187,33 +187,44 @@ interface CommandOutputProps {
 
 **File**: `components/ConfirmGate.tsx`
 
-Forces the user to type the exact count of repos to be deleted before enabling the delete button. The shake animation on incorrect submission is intentional friction.
+Forces the user to type the exact count of repos to be deleted before enabling the delete button. The shake animation on incorrect submission is intentional friction that prevents accidental confirmation.
 
 **Props**:
 
 ```ts
 interface ConfirmGateProps {
-  count: number
-  onConfirm: () => void
-  loading?: boolean
+  count: number      // exact integer the user must type to unlock the button
+  onConfirm: () => void  // called once after a matching click
+  loading?: boolean  // when true, disables controls and shows a spinner (default false)
 }
 ```
 
 **State**:
 
-| State | Type | Purpose |
-|-------|------|---------|
-| `input` | `string` | Current value of the confirmation input |
-| `shaking` | `boolean` | Triggers the shake animation on the button |
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `input` | `string` | `''` | Current value of the confirmation text input |
+| `shaking` | `boolean` | `false` | Drives the `animate-shake` CSS class on the delete button |
 
-**Derived**: `confirmed = input === String(count)`
+**Derived**: `confirmed = input === String(count)` — strict string equality; leading or trailing whitespace does not match.
 
 **Behavior**:
-- Label reads "Type {count} to confirm"
-- The delete button is `disabled` and `opacity-50 cursor-not-allowed` when `!confirmed`
-- When confirmed, the button turns red (`bg-red-600`)
-- Clicking the button while `!confirmed` triggers a 400ms shake animation (CSS keyframes defined in `config/tailwind.config.ts` as `animate-shake`) and does nothing else
-- When `loading === true`, the button shows a spinner instead of text
+
+- **Label**: "Type {count} to confirm" — the count is rendered in a `<span>` with `font-mono font-semibold` so the number is visually prominent.
+- **Input** (`id="confirm-input"`, `type="text"`, `autoComplete="off"`, `aria-label="Type {count} to confirm"`): bound to `input` state via `onChange`. Width is fixed at `w-32`. Disabled when `loading === true`.
+- **Button (inactive state — `!confirmed`)**: styled `bg-zinc-200 opacity-50 cursor-not-allowed`; `aria-disabled="true"`. Clicking while `!confirmed` calls `setShaking(true)`, schedules `setShaking(false)` via `setTimeout` after 400ms, then returns — `onConfirm` is never called.
+- **Button (active state — `confirmed && !loading`)**: styled `bg-red-600 hover:bg-red-700 text-white`; `aria-disabled="false"`. Clicking invokes `onConfirm()` immediately.
+- **Button label**: `Delete {count} repository` (singular when `count === 1`) or `Delete {count} repositories` (plural otherwise).
+- **Loading state** (`loading === true`): both the input and button are HTML-`disabled`. The button body is replaced with an `animate-spin` SVG icon and the text "Deleting…".
+- **Shake animation**: `animate-shake` class is conditionally appended to the button's class list while `shaking === true`. The keyframe is defined in `config/tailwind.config.ts` (0.4s, `ease-in-out`, ±6px horizontal translate). The class is added synchronously on click and cleared by a `setTimeout` callback after 400ms.
+
+**Accessibility**:
+
+- The label's `htmlFor="confirm-input"` creates a programmatic association so screen readers announce "Type {count} to confirm" when the input receives focus.
+- `aria-disabled={!confirmed}` on the button communicates semantic disabled state even though the button is not HTML-`disabled` before matching — assistive technology announces it as unavailable until the correct count is typed.
+- The spinner SVG carries `aria-hidden="true"` so screen readers do not announce it alongside the "Deleting…" text.
+
+**Usage context**: rendered by `app/confirm/page.tsx` inside the "Delete in app" mode branch, passing `count={selected.length}`, `onConfirm={handleConfirm}`, and `loading={deleting}`. The `onConfirm` callback sets `deleting = true`, which mounts `<DeleteProgress>` and triggers the `POST /api/delete` request.
 
 ---
 
