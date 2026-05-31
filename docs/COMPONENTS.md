@@ -61,6 +61,34 @@ interface HomeProps {
 
 ---
 
+### Repos Page (`app/repos/page.tsx`)
+
+**File**: `app/repos/page.tsx`
+
+**Type**: Async server component
+
+The repo selection page. Protected by middleware — only reachable when `session.accessToken` is present.
+
+**Behavior**:
+
+1. **Session read**: Calls `getSession()` to obtain the authenticated user's access token.
+2. **Repo fetch**: Calls `listPublicRepos(session.accessToken)` directly (not via `fetch('/api/repos')`). Calling the library function directly avoids an unnecessary HTTP round-trip to the same server process.
+3. **Error path**: If `listPublicRepos` throws, the error is logged server-side via `console.error('[ReposPage] listPublicRepos failed', { login, error })` — the session login and the full error object are included so that operational failures (revoked tokens, GitHub rate limits, transient 5xx) are visible in server logs without exposing the raw access token. The error message is then captured in `fetchError` and an inline `role="alert"` box is rendered alongside a "Try again" anchor (`href="/repos"`). Navigating to that link re-triggers the server-side fetch.
+4. **Success path**: The `repos` array (which may be empty) is forwarded as the `repos` prop to `<RepoList>`. The `<RepoList>` client component renders the "No repositories to show." empty state when given an empty array.
+
+**Rendered elements**:
+
+| Element | Condition | Purpose |
+|---------|-----------|---------|
+| `<h1>Your repositories</h1>` | Always | Page heading |
+| `<div role="alert">` | Error path only | Error message from `listPublicRepos` |
+| `<a href="/repos">Try again</a>` | Error path only | Navigates back to re-trigger the fetch |
+| `<RepoList repos={repos} />` | Success path only | Interactive selection list |
+
+**Server/client split**: `app/repos/page.tsx` is the server boundary. It fetches data and passes it down as props. All interactive state (checkbox selection, search query, fork-visibility toggle) lives in the `<RepoList>` client component.
+
+---
+
 ## React Components
 
 All five components are client components (`'use client'`). They are rendered inside server component page shells that pass data as props.

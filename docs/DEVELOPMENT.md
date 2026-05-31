@@ -47,6 +47,7 @@ tests/
     ├── Layout.test.tsx          Nav bar structure: wordmark link, authenticated user section, unauthenticated state (8 cases)
     ├── LandingPage.test.tsx     Landing page: headline, OAuth link target, error alerts, authenticated redirect (7 cases)
     ├── RepoList.test.tsx        RepoList: fork toggle, search filter, keyboard selection, combined filters, row element rendering, relativeTime NaN guard, select-all edge cases, Continue flow (24 cases)
+    ├── ReposPage.test.tsx       /repos page: heading render, repos forwarded to RepoList, empty repos (0 count), error alert, Try again link href, RepoList absent on error (6 cases)
     └── SignOutButton.test.tsx   Render, click handler, success navigation, non-2xx error path, network error path (15 cases)
 ```
 
@@ -70,6 +71,8 @@ tests/
 
 `Layout.test.tsx` exercises the nav bar's structural contract via an inline `Nav` component (the real `RootLayout` is an async server component that requires `next/headers` and cannot be driven by Jest directly). The suite covers: the Depo wordmark link pointing to `/`; login name visibility when authenticated vs. unauthenticated; sign-out button visibility; GitHub avatar rendering when `avatarUrl` is provided vs. omitted; and that the unauthenticated state renders no user-section elements.
 
+`ReposPage.test.tsx` mocks `@/lib/session`, `@/lib/github`, and `@/components/RepoList` at the module boundary and calls `ReposPage()` as an async function, rendering the returned JSX with React Testing Library. `RepoList` is mocked using `React.createElement` (not JSX) because `jest.mock()` factories are extracted by `babel-plugin-jest-hoist` before ts-jest's TypeScript pass runs — JSX or type annotations inside the factory would cause a Babel parse error. A `console.error` spy is installed in `beforeEach` (suppressing output) and restored in `afterEach` via `jest.restoreAllMocks()`. The suite covers: the "Your repositories" heading is always present; fetched repos are forwarded to `<RepoList>` (verified via a `data-testid` text count); an empty array produces a 0-count display; a thrown error produces a `role="alert"` containing the message AND triggers `console.error` with the `[ReposPage]` prefix and `{ login, error }` context; the "Try again" link has `href="/repos"`; and `<RepoList>` is absent when an error occurs.
+
 `RepoList.test.tsx` mocks `next/navigation` (providing a `useRouter` stub with a `push` spy) and clears `sessionStorage` between each test. A `makeRepo()` fixture builder produces `Repo` objects with sensible defaults and per-field overrides; fixture IDs are assigned by an auto-incrementing `idCounter` (reset to 1 at the top of `beforeEach`) rather than `Math.random()`. The shared `repos` array (alpha / beta-fork / gamma) is also re-created in `beforeEach` immediately after the counter reset, so alpha always gets id=1, beta id=2, gamma id=3 without needing explicit overrides, and no test can corrupt the array for a later one. The suite is organised into functional areas: **fork visibility** — forks hidden by default, revealed by the toggle, toggle absent when no forks exist; **search** — case-insensitive name matching, empty-result message; **keyboard interaction** — `Space` and `Enter` on a focused row both toggle selection (dispatched with `fireEvent.keyDown` on the `<li>` reached via `closest('li')`), and a second keypress deselects a selected row; **combined search and fork filter** — enabling the fork toggle then applying a search that only matches the fork exercises both filters simultaneously and triggers the empty-state message when the toggle is disabled again; **row element rendering** — fork badge shown only when `showForks && repo.fork`, star count with `aria-label` rendered only when `stargazerCount > 0`; **relativeTime guard** — rendering a repo with `updatedAt: 'invalid-date'` asserts "just now" is displayed and no "NaN" substring appears, exercising the `isNaN` guard through the full rendering path; **select-all edge cases** — select-all checkbox is `disabled` (not absent) when `visibleRepos` is empty; **select-all toggle** — selects all visible repos on first click, deselects all on second; **Continue flow** — `sessionStorage['depo:selected']` populated, `router.push('/confirm')` called; **display** — relative time rendered, description shown when non-null and absent when null.
 
 ### Mock Patterns
@@ -88,6 +91,20 @@ jest.mock('@octokit/rest', () => ({ Octokit: jest.fn() }))
 
 // Mock global fetch for API route tests
 global.fetch = jest.fn()
+```
+
+**Important constraint — no TypeScript or JSX in `jest.mock()` factories**: `jest.mock()` is hoisted by `babel-plugin-jest-hoist` before ts-jest's TypeScript compilation pass runs. The factory function is extracted and parsed by plain Babel (without the TypeScript or JSX plugins), so any type annotations or JSX syntax inside the factory causes a parse error. Use plain JavaScript inside factories; if you need to render a React element from a mock, use `require('react').createElement(...)` instead of JSX:
+
+```ts
+// ✓ Correct — plain JS with createElement
+jest.mock('@/components/Foo', () => ({
+  Foo: (props) => require('react').createElement('div', { 'data-testid': 'foo' }, props.count),
+}))
+
+// ✗ Wrong — JSX and TypeScript annotations both fail at Babel extraction time
+jest.mock('@/components/Foo', () => ({
+  Foo: ({ count }: { count: number }) => <div data-testid="foo">{count}</div>,
+}))
 ```
 
 ### End-to-End Tests (Playwright)
