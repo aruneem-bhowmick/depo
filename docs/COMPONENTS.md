@@ -78,7 +78,6 @@ The primary interactive UI. Renders a searchable, filterable list of repositorie
 ```ts
 interface RepoListProps {
   repos: Repo[]
-  initialLogin: string
 }
 ```
 
@@ -86,22 +85,24 @@ interface RepoListProps {
 
 | State | Type | Default | Purpose |
 |-------|------|---------|---------|
-| `selected` | `Set<string>` | Empty set | Names of selected repos |
+| `selected` | `Set<string>` | Empty set | Short names of selected repos |
 | `showForks` | `boolean` | `false` | Whether fork repos are visible |
-| `search` | `string` | `''` | Current search query |
+| `search` | `string` | `''` | Current name-filter query |
 
-**Derived values**:
-- `forkCount` — total number of fork repos in the list
-- `visibleRepos` — repos after applying fork filter and search filter (case-insensitive `includes`)
-- `allVisibleSelected` — true when all visible repos are checked
+**Derived values** (each wrapped in `useMemo` — recomputed only when their inputs change):
+- `forkCount` — total number of fork repos in the unfiltered list; drives the conditional fork-toggle rendering
+- `visibleRepos` — repos after applying the fork filter then the case-insensitive name search in that order
+- `allVisibleSelected` — `true` only when every repo in `visibleRepos` is present in `selected`
 
 **Behavior**:
-- The fork toggle only renders when `forkCount > 0`; its label shows "Show forks (N)"
-- Clicking any row toggles that repo's checkbox
-- "Select all" selects all currently *visible* repos (respects both filters); if all visible repos are already selected, it deselects all
-- The sticky footer appears when `selected.size > 0`. "Continue →" serializes the selection to `sessionStorage['depo:selected']` and navigates to `/confirm`
+- The fork toggle checkbox only renders when `forkCount > 0`; its `aria-label` reads "Show N fork(s)"
+- Clicking any row — or pressing `Space`/`Enter` on a focused row — toggles that repo's selection. The inner `<input type="checkbox">` has `onClick={e => e.stopPropagation()}` to prevent a double-toggle when the user clicks the checkbox element directly
+- "Select all" selects all currently *visible* repos (respects both filters simultaneously); if all visible repos are already selected, a second click deselects them all. Repos hidden by either filter are unaffected
+- The sticky footer is `position: fixed` and only mounts when `selected.size > 0`; "Continue →" calls `handleContinue`, which serialises the selection with `Array.from(selected)` to `sessionStorage['depo:selected']` and navigates via `router.push('/confirm')`
 
-**Row elements** (per repo): checkbox, monospace repo name, truncated description (omitted if null), star count, fork badge (only when forks are shown), relative last-updated time.
+**Row elements** (per repo): checkbox, monospace repo name, fork badge (only when `showForks && repo.fork`), star count with `aria-label` (only when `stargazerCount > 0`), truncated description paragraph (omitted when `description` is `null`), relative last-updated time via `relativeTime`.
+
+**`relativeTime(iso: string | null): string`** — module-private pure function. Converts an ISO 8601 timestamp to a human-readable relative string ("2d ago", "3mo ago", etc.). Returns `"just now"` for three cases: `null` (repos that have never been pushed to), an unparseable string (guards against `NaN` propagating through the arithmetic chain — `new Date("garbage").getTime()` returns `NaN`, and without this guard the function would return `"NaNy ago"`), and timestamps fewer than 60 seconds old. The parsed timestamp is captured in a named variable and validated with `isNaN` before any arithmetic occurs. Thresholds in ascending order: seconds → minutes → hours → days → months → years.
 
 ---
 

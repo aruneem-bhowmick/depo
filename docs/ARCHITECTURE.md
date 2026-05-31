@@ -58,6 +58,8 @@ User
 
 The server/client split is intentional: pages that need `sessionStorage` or interactive state are client components; data-fetching entry points are server components that pass data as props.
 
+**`/repos` rendering boundary**: `app/repos/page.tsx` is an async server component. It calls `listPublicRepos(token)` directly (not via `fetch('/api/repos')`, avoiding an unnecessary HTTP round-trip to the same process), then passes the result as the `repos` prop to `<RepoList>`. `<RepoList>` is a client component — it owns all interactive state (selection set, search query, fork-visibility toggle) and writes the serialised selection to `sessionStorage` when the user proceeds to `/confirm`.
+
 ---
 
 ## API Routes
@@ -112,8 +114,8 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 | Key (`lib/constants.ts`) | Type | Set by | Read by | Cleared by |
 |--------------------------|------|--------|---------|------------|
-| `depo:selected` | `string[]` (repo names) | `/repos` "Continue" button | `/confirm` on mount | `/done` on mount |
-| `depo:results` | `DeletionResult[]` | `/confirm` after deletion | `/done` on mount | `/done` on mount |
+| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` after dispatching the deletion request |
+| `depo:results` | `DeletionResult[]` | `/confirm` after the `POST /api/delete` response | `/done` on mount | `/done` on mount |
 
 ### HTTP Cookie (server-side, httpOnly)
 
