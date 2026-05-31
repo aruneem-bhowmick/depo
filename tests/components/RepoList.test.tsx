@@ -28,16 +28,17 @@ function makeRepo(overrides: Partial<Repo> = {}): Repo {
   }
 }
 
-const repos: Repo[] = [
-  makeRepo({ id: 1, name: 'alpha', fork: false }),
-  makeRepo({ id: 2, name: 'beta', fork: true }),
-  makeRepo({ id: 3, name: 'gamma', fork: false }),
-]
+let repos: Repo[]
 
 beforeEach(() => {
   jest.clearAllMocks()
   sessionStorage.clear()
   idCounter = 1
+  repos = [
+    makeRepo({ name: 'alpha', fork: false }),
+    makeRepo({ name: 'beta', fork: true }),
+    makeRepo({ name: 'gamma', fork: false }),
+  ]
 })
 
 describe('RepoList', () => {
@@ -54,7 +55,7 @@ describe('RepoList', () => {
   })
 
   it('does not show fork toggle when no forks exist', () => {
-    render(<RepoList repos={[makeRepo({ id: 1, name: 'a', fork: false })]} />)
+    render(<RepoList repos={[makeRepo({ name: 'a', fork: false })]} />)
     expect(screen.queryByLabelText(/show.*fork/i)).not.toBeInTheDocument()
   })
 
