@@ -89,6 +89,42 @@ The repo selection page. Protected by middleware — only reachable when `sessio
 
 ---
 
+### Confirmation Page (`app/confirm/page.tsx`)
+
+**File**: `app/confirm/page.tsx`
+
+**Type**: Client component (`'use client'`)
+
+The confirmation and execution page. Reads the repo selection from `sessionStorage`, offers three output modes, and drives the in-app deletion flow.
+
+**State**:
+
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `selected` | `string[]` | `[]` | Repo names read from `sessionStorage[SESSION_KEY_SELECTED]` |
+| `owner` | `string` | `''` | GitHub login fetched from `GET /api/me` |
+| `mode` | `'app' \| 'gh' \| 'curl'` | `'app'` | Active output mode |
+| `deleting` | `boolean` | `false` | When `true`, mounts `<DeleteProgress>` instead of `<ConfirmGate>` |
+| `mounted` | `boolean` | `false` | Guards against server/client hydration mismatch — renders `null` until `true` |
+
+**Mount behavior**:
+1. `useEffect([router])`: reads and parses `sessionStorage[SESSION_KEY_SELECTED]`. If the key is missing, the JSON is invalid, or the array is empty, calls `router.replace('/repos')` and returns without setting `mounted`. On success, calls `setSelected(parsed)` and `setMounted(true)`.
+2. `useEffect([])`: calls `GET /api/me` to obtain the session login. Sets `owner` on success; silently swallows errors (commands are withheld until `owner` is non-empty).
+
+**Output modes** (segmented `role="group"` control with `aria-pressed`):
+- **`app`** — shows `<ConfirmGate count={selected.length} onConfirm={handleConfirm} />`. On confirm, sets `deleting = true`, mounting `<DeleteProgress>`.
+- **`gh`** — shows `<CommandOutput command={ghCommand} mode="gh" />`. `ghCommand` is generated via `generateCommand(owner, selected, 'gh')` and is only non-empty when `owner` has resolved.
+- **`curl`** — shows `<CommandOutput command={curlCommand} mode="curl" />`. Same guard on `owner`.
+
+**Deletion completion** (`handleDeletionComplete`):
+1. Writes `results` to `sessionStorage[SESSION_KEY_RESULTS]`.
+2. Removes `sessionStorage[SESSION_KEY_SELECTED]` — the selection is consumed.
+3. Calls `router.push('/done')`.
+
+**"← Change selection"**: calls `router.back()` — browser history takes the user back to `/repos` with `sessionStorage` intact so selections are preserved.
+
+---
+
 ## React Components
 
 All five components are client components (`'use client'`). They are rendered inside server component page shells that pass data as props.
@@ -138,7 +174,7 @@ interface RepoListProps {
 
 **File**: `components/DeleteProgress.tsx`
 
-Fires the deletion request on mount and displays per-repo status indicators.
+Fires the deletion request once on mount and displays per-repo status indicators as they resolve.
 
 **Props**:
 
@@ -149,13 +185,23 @@ interface DeleteProgressProps {
 }
 ```
 
-**Behavior**:
-- On mount, immediately sends `POST /api/delete` with `{ repos }`
-- Shows an indeterminate progress bar while waiting for the response (the route processes sequentially server-side and returns all results at once)
-- Once results arrive, renders each repo with a status icon: gray spinner (pending, shown only during loading), green checkmark (`deleted`), or red X with error text (`error`)
-- Calls `onComplete(results)` when the response is processed
+**State**:
 
-**Notes**: `/api/delete` returns a single response after all deletions complete. Per-repo streaming via Server-Sent Events is a future enhancement (see [ROADMAP.md](ROADMAP.md)).
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `results` | `DeletionResult[] \| null` | `null` | API response; `null` while in flight |
+| `error` | `string \| null` | `null` | Set if the `fetch` itself throws (network error) |
+
+**Behavior**:
+- On mount (`useEffect` with empty dependency array), immediately sends `POST /api/delete` with `{ repos }`. The effect runs exactly once — no re-fires.
+- While awaiting the response: renders an indeterminate progress bar (`role="progressbar"`, `aria-label="Deleting repositories…"`) and a count label.
+- After the response arrives: renders each repo as a list item with a per-row status icon.
+  - Green checkmark SVG (`aria-label="Deleted"`) for `status: 'deleted'`.
+  - Red X SVG (`aria-label="Error"`) for `status: 'error'`, with the `DeletionResult.error` string rendered in smaller red text below the repo name.
+- Calls `onComplete(results)` immediately after updating state so the parent can persist results and navigate to `/done`.
+- If `fetch` throws (e.g., a network failure): renders a `role="alert"` error box and never calls `onComplete`.
+
+**Notes**: `/api/delete` returns a single response after all deletions complete server-side. Per-repo streaming via Server-Sent Events is a future enhancement (see [ROADMAP.md](ROADMAP.md)).
 
 ---
 
@@ -163,23 +209,33 @@ interface DeleteProgressProps {
 
 **File**: `components/CommandOutput.tsx`
 
-Renders a syntax-highlighted CLI command block with a copy-to-clipboard button.
+Renders a CLI command in a dark code block with a one-click copy-to-clipboard button.
 
 **Props**:
 
 ```ts
 interface CommandOutputProps {
   command: string
-  mode: 'gh' | 'curl'
+  mode: CommandMode  // 'gh' | 'curl'
 }
 ```
 
+**State**:
+
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `copied` | `boolean` | `false` | Drives the "Copied!" / "Copy" button label |
+
 **Behavior**:
-- Displays the command in a `<pre><code>` block styled with a dark background (`bg-zinc-900 text-zinc-100`)
-- "Copy" button in the top-right corner calls `navigator.clipboard.writeText(command)` and changes its label to "Copied!" for 2 seconds
-- For `mode === 'curl'`, renders a yellow warning box above the code block:
+- Displays the command in a `<pre><code>` block styled with a dark background (`bg-zinc-900 text-zinc-100`). The `<pre>` preserves whitespace and newlines from multi-line generated scripts.
+- "Copy" button (top-right, absolutely positioned) calls `navigator.clipboard.writeText(command)`. On success: flips label to "Copied!" for exactly 2 seconds then reverts. On failure (non-HTTPS context, browser permission denied): silently swallowed — label does not change.
+- For `mode === 'curl'`, renders a yellow `role="note"` informational banner above the code block:
 
   > "This command uses `<your-token>` as a placeholder. Replace it with a GitHub personal access token that has `delete_repo` scope before running. Do not store tokens in shell history."
+
+  The banner uses `role="note"` (not `role="alert"`) — it is informational, not urgent, and must not interrupt screen readers unexpectedly.
+
+**Accessibility**: the copy button carries `aria-label` set to `"Copied!"` when in the copied state and `"Copy command"` otherwise, so screen readers announce the current action.
 
 ---
 
