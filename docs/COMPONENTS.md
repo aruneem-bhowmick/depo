@@ -112,7 +112,7 @@ The confirmation and execution page. Reads the repo selection from `sessionStora
 2. `useEffect([])`: calls `GET /api/me` to obtain the session login. Sets `owner` on success; silently swallows errors (commands are withheld until `owner` is non-empty).
 
 **Output modes** (segmented `role="group"` control with `aria-pressed`):
-- **`app`** — shows `<ConfirmGate count={selected.length} onConfirm={handleConfirm} />`. On confirm, sets `deleting = true`, mounting `<DeleteProgress>`.
+- **`app`** — shows `<ConfirmGate count={selected.length} onConfirm={handleConfirm} />`. On confirm, sets `deleting = true`, mounting `<DeleteProgress>`. Both `ConfirmGate` and `DeleteProgress` are **only rendered when `mode === 'app'`** — switching to `gh` or `curl` unmounts them, preventing the user from accidentally triggering an in-app deletion while inspecting a CLI command.
 - **`gh`** — shows `<CommandOutput command={ghCommand} mode="gh" />`. `ghCommand` is generated via `generateCommand(owner, selected, 'gh')` and is only non-empty when `owner` has resolved.
 - **`curl`** — shows `<CommandOutput command={curlCommand} mode="curl" />`. Same guard on `owner`.
 
@@ -195,11 +195,14 @@ interface DeleteProgressProps {
 **Behavior**:
 - On mount (`useEffect` with empty dependency array), immediately sends `POST /api/delete` with `{ repos }`. The effect runs exactly once — no re-fires.
 - While awaiting the response: renders an indeterminate progress bar (`role="progressbar"`, `aria-label="Deleting repositories…"`) and a count label.
-- After the response arrives: renders each repo as a list item with a per-row status icon.
+- **HTTP status check**: after `fetch` resolves, `res.ok` is checked before parsing the body. If the status is non-2xx (e.g., `401 Not authenticated`, `400 Invalid body`), the error body is parsed and `setError(errData.error ?? 'Deletion failed. Please try again.')` is called; `setResults` and `onComplete` are never reached.
+- After a successful (`res.ok`) response: renders each repo as a list item with a per-row status icon.
   - Green checkmark SVG (`aria-label="Deleted"`) for `status: 'deleted'`.
   - Red X SVG (`aria-label="Error"`) for `status: 'error'`, with the `DeletionResult.error` string rendered in smaller red text below the repo name.
 - Calls `onComplete(results)` immediately after updating state so the parent can persist results and navigate to `/done`.
-- If `fetch` throws (e.g., a network failure): renders a `role="alert"` error box and never calls `onComplete`.
+- **Error paths** — both render a `role="alert"` box and never call `onComplete`:
+  - `fetch` throws (network failure, DNS error, request timeout).
+  - `fetch` resolves with a non-ok HTTP status (e.g., session expired, validation error).
 
 **Notes**: `/api/delete` returns a single response after all deletions complete server-side. Per-repo streaming via Server-Sent Events is a future enhancement (see [ROADMAP.md](ROADMAP.md)).
 
