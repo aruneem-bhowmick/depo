@@ -42,6 +42,11 @@ export function DeleteProgress({ repos, onComplete }: DeleteProgressProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ repos }),
         })
+        if (!res.ok) {
+          const errData = await res.json() as { error?: string }
+          setError(errData.error ?? 'Deletion failed. Please try again.')
+          return
+        }
         const data = await res.json() as { results: DeletionResult[] }
         setResults(data.results)
         onComplete(data.results)
