@@ -73,12 +73,14 @@ describe('/confirm page', () => {
     await waitFor(() => expect(screen.getByTestId('delete-progress')).toBeInTheDocument())
   })
 
-  it('shows CommandOutput when mode is gh', async () => {
+  it('shows CommandOutput when mode is gh and hides in-app deletion controls', async () => {
     sessionStorage.setItem('depo:selected', JSON.stringify(['alpha']))
     render(<ConfirmPage />)
     await waitFor(() => screen.getByRole('group', { name: /output mode/i }))
     fireEvent.click(screen.getByRole('button', { name: /generate gh command/i }))
     await waitFor(() => expect(screen.getByTestId('command-output')).toBeInTheDocument())
+    expect(screen.queryByTestId('confirm-gate')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delete-progress')).not.toBeInTheDocument()
   })
 
   it('writes results to sessionStorage and navigates to /done after deletion', async () => {
@@ -111,12 +113,14 @@ describe('/confirm page', () => {
     await waitFor(() => expect(screen.getByRole('heading')).toHaveTextContent('1 repository for deletion'))
   })
 
-  it('shows CommandOutput when mode is curl', async () => {
+  it('shows CommandOutput when mode is curl and hides in-app deletion controls', async () => {
     sessionStorage.setItem('depo:selected', JSON.stringify(['alpha']))
     render(<ConfirmPage />)
     await waitFor(() => screen.getByRole('group', { name: /output mode/i }))
     fireEvent.click(screen.getByRole('button', { name: /generate curl command/i }))
     await waitFor(() => expect(screen.getByTestId('command-output')).toBeInTheDocument())
+    expect(screen.queryByTestId('confirm-gate')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('delete-progress')).not.toBeInTheDocument()
   })
 
   it('clears SESSION_KEY_SELECTED from sessionStorage after deletion completes', async () => {
