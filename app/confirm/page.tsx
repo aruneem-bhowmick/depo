@@ -147,16 +147,18 @@ export default function ConfirmPage() {
         />
       )}
 
-      {!deleting ? (
-        <ConfirmGate
-          count={selected.length}
-          onConfirm={handleConfirm}
-        />
-      ) : (
-        <DeleteProgress
-          repos={selected}
-          onComplete={handleDeletionComplete}
-        />
+      {mode === 'app' && (
+        !deleting ? (
+          <ConfirmGate
+            count={selected.length}
+            onConfirm={handleConfirm}
+          />
+        ) : (
+          <DeleteProgress
+            repos={selected}
+            onComplete={handleDeletionComplete}
+          />
+        )
       )}
     </div>
   )
