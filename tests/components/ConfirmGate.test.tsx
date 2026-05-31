@@ -8,7 +8,8 @@
  * - Input matching logic: correct value calls onConfirm; wrong value or
  *   leading/trailing whitespace does not
  * - Shake animation: animate-shake class added on wrong click, removed after 400ms
- * - Loading state: spinner rendered, input disabled, onConfirm never called
+ * - Loading state: spinner rendered, input disabled, onConfirm blocked even on
+ *   programmatic click (fireEvent bypasses the HTML disabled attribute in jsdom)
  * - aria-disabled attribute reflects confirmed state
  */
 import { render, screen, fireEvent, act } from '@testing-library/react'
@@ -65,6 +66,15 @@ describe('ConfirmGate', () => {
   it('disables input when loading=true', () => {
     render(<ConfirmGate count={3} onConfirm={jest.fn()} loading />)
     expect(screen.getByRole('textbox')).toBeDisabled()
+  })
+
+  it('does not call onConfirm when loading=true even on programmatic click', () => {
+    // fireEvent.click bypasses the HTML disabled attribute in jsdom; the loading
+    // guard inside handleSubmit is what prevents onConfirm from firing here.
+    const onConfirm = jest.fn()
+    render(<ConfirmGate count={3} onConfirm={onConfirm} loading />)
+    fireEvent.click(screen.getByRole('button'))
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('button has aria-disabled=true when input does not match', () => {
