@@ -23,7 +23,10 @@ import type { Repo } from '@/lib/types'
  *
  * **Error path**: an inline `role="alert"` box containing the error message is
  * shown, along with a "Try again" anchor to `/repos` that re-triggers the
- * server-side fetch on navigation.
+ * server-side fetch on navigation. The caught error is also logged server-side
+ * via `console.error` with structured context (session login, error object) so
+ * that failures such as revoked tokens or GitHub rate limits are visible in
+ * server logs without exposing the raw access token.
  */
 export default async function ReposPage() {
   const session = await getSession()
@@ -34,6 +37,10 @@ export default async function ReposPage() {
   try {
     repos = await listPublicRepos(session.accessToken)
   } catch (err: unknown) {
+    console.error('[ReposPage] listPublicRepos failed', {
+      login: session.login,
+      error: err,
+    })
     fetchError = err instanceof Error ? err.message : 'Failed to load repositories.'
   }
 
