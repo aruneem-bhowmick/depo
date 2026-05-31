@@ -122,6 +122,12 @@ describe('RepoList', () => {
     expect(screen.getAllByText(/ago|just now/).length).toBeGreaterThan(0)
   })
 
+  it('renders "just now" instead of "NaNy ago" when updatedAt is an invalid date string', () => {
+    render(<RepoList repos={[makeRepo({ name: 'broken', updatedAt: 'invalid-date' })]} />)
+    expect(screen.getByText('just now')).toBeInTheDocument()
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument()
+  })
+
   it('shows description when present', () => {
     render(<RepoList repos={[makeRepo({ description: 'My cool project' })]} />)
     expect(screen.getByText('My cool project')).toBeInTheDocument()
