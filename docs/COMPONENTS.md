@@ -73,7 +73,7 @@ The repo selection page. Protected by middleware — only reachable when `sessio
 
 1. **Session read**: Calls `getSession()` to obtain the authenticated user's access token.
 2. **Repo fetch**: Calls `listPublicRepos(session.accessToken)` directly (not via `fetch('/api/repos')`). Calling the library function directly avoids an unnecessary HTTP round-trip to the same server process.
-3. **Error path**: If `listPublicRepos` throws, the error message is captured and an inline `role="alert"` box is rendered alongside a "Try again" anchor (`href="/repos"`). Navigating to that link re-triggers the server-side fetch.
+3. **Error path**: If `listPublicRepos` throws, the error is logged server-side via `console.error('[ReposPage] listPublicRepos failed', { login, error })` — the session login and the full error object are included so that operational failures (revoked tokens, GitHub rate limits, transient 5xx) are visible in server logs without exposing the raw access token. The error message is then captured in `fetchError` and an inline `role="alert"` box is rendered alongside a "Try again" anchor (`href="/repos"`). Navigating to that link re-triggers the server-side fetch.
 4. **Success path**: The `repos` array (which may be empty) is forwarded as the `repos` prop to `<RepoList>`. The `<RepoList>` client component renders the "No repositories to show." empty state when given an empty array.
 
 **Rendered elements**:
