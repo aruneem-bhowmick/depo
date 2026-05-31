@@ -6,10 +6,16 @@ import type { Repo } from '@/lib/types'
 const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
 
+/**
+ * Auto-incrementing counter used by makeRepo so every fixture gets a
+ * unique, predictable numeric id. Reset to 1 in beforeEach for isolation.
+ */
+let idCounter = 1
+
 /** Builds a Repo fixture, merging any overrides on top of sensible defaults. */
 function makeRepo(overrides: Partial<Repo> = {}): Repo {
   return {
-    id: Math.random(),
+    id: idCounter++,
     name: 'test-repo',
     fullName: 'alice/test-repo',
     description: 'A test repo',
@@ -31,6 +37,7 @@ const repos: Repo[] = [
 beforeEach(() => {
   jest.clearAllMocks()
   sessionStorage.clear()
+  idCounter = 1
 })
 
 describe('RepoList', () => {
