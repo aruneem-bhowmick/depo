@@ -45,6 +45,8 @@ tests/
 │   └── apiSignout.test.ts      POST /api/signout: session.destroy() call, redirect to /, no-op on empty session, NEXT_PUBLIC_APP_URL fallback (5 cases)
 └── components/
     ├── Layout.test.tsx          Nav bar structure: wordmark link, authenticated user section, unauthenticated state (8 cases)
+    ├── LandingPage.test.tsx     Landing page: headline, OAuth link target, error alerts, authenticated redirect (7 cases)
+    ├── RepoList.test.tsx        RepoList: fork toggle, search filter, row selection, select-all, Continue flow, relative time (14 cases)
     └── SignOutButton.test.tsx   Render, click handler, success navigation, non-2xx error path, network error path (15 cases)
 ```
 
@@ -67,6 +69,8 @@ tests/
 `SignOutButton.test.tsx` mocks `next/navigation` (providing `useRouter` with `push` and `refresh` stubs), spies on `console.error`, and sets `global.fetch` per describe block. The suite is split into three groups: **success path** (7 cases) — button render, `POST /api/signout` is called, fetch fires exactly once, `router.push('/')` is called, `router.refresh()` is called, focus-ring classes are present, no error alert is shown; **non-2xx failure** (4 cases) — navigation is suppressed when `response.ok` is false, `router.refresh()` is not called, an error `<span role="alert">` appears containing the HTTP status, `console.error` is called with the `[SignOutButton]` prefix; **network error** (4 cases) — same navigation-suppression and alert checks when `fetch` rejects entirely.
 
 `Layout.test.tsx` exercises the nav bar's structural contract via an inline `Nav` component (the real `RootLayout` is an async server component that requires `next/headers` and cannot be driven by Jest directly). The suite covers: the Depo wordmark link pointing to `/`; login name visibility when authenticated vs. unauthenticated; sign-out button visibility; GitHub avatar rendering when `avatarUrl` is provided vs. omitted; and that the unauthenticated state renders no user-section elements.
+
+`RepoList.test.tsx` mocks `next/navigation` (providing a `useRouter` stub with a `push` spy) and clears `sessionStorage` between each test. A `makeRepo()` fixture builder produces `Repo` objects with sensible defaults, allowing individual fields to be overridden. The suite is organised into functional areas: **fork visibility** — forks hidden by default, revealed by the toggle, toggle absent when no forks exist; **search** — case-insensitive name matching, empty-result message; **row selection** — clicking a row selects it and causes the sticky footer to appear; **select-all** — selects all visible repos on the first click, deselects all on the second; **Continue flow** — `sessionStorage['depo:selected']` is populated with the selected names, `router.push('/confirm')` is called; **display** — `relativeTime` output present, description shown when non-null and absent when null.
 
 ### Mock Patterns
 
