@@ -69,6 +69,7 @@ The server/client split is intentional: pages that need `sessionStorage` or inte
 | `GET` | `/api/auth/login` | None | Generate CSRF nonce, set `depo_oauth_state` cookie, redirect to GitHub OAuth |
 | `GET` | `/api/auth/callback` | None | Exchange GitHub OAuth code for access token, set session |
 | `GET` | `/api/repos` | Session cookie | Return authenticated user's public repos |
+| `GET` | `/api/me` | Session cookie | Return authenticated user's login name (used by `/confirm` for CLI command generation) |
 | `POST` | `/api/delete` | Session cookie | Sequentially delete selected repos with rate-limit delay |
 | `POST` | `/api/signout` | None | Destroy session cookie, redirect to `/` |
 
@@ -114,7 +115,7 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 | Key (`lib/constants.ts`) | Type | Set by | Read by | Cleared by |
 |--------------------------|------|--------|---------|------------|
-| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` after dispatching the deletion request |
+| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` in `handleDeletionComplete` — after the `POST /api/delete` response arrives and before navigation to `/done` |
 | `depo:results` | `DeletionResult[]` | `/confirm` after the `POST /api/delete` response | `/done` on mount | `/done` on mount |
 
 ### HTTP Cookie (server-side, httpOnly)
@@ -166,6 +167,7 @@ depo/
 │   └── api/
 │       ├── auth/callback/route.ts  OAuth code exchange
 │       ├── repos/route.ts          List public repos
+│       ├── me/route.ts             Return session login (for client-side CLI generation)
 │       ├── delete/route.ts         Bulk delete (sequential, 150ms delay)
 │       └── signout/route.ts        Session destruction
 │

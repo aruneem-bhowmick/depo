@@ -1,6 +1,6 @@
 # API Reference
 
-Depo exposes five serverless API routes. All routes run server-side and access the GitHub token exclusively via the encrypted session cookie — the token is never returned to the client.
+Depo exposes six serverless API routes. All routes run server-side and access the GitHub token exclusively via the encrypted session cookie — the token is never returned to the client.
 
 ---
 
@@ -201,6 +201,33 @@ Partial failure is not treated as a total failure — all repos in the batch are
 - The owner parameter for every GitHub API call is sourced exclusively from `session.login` — it is never parsed from the repo name or the request body.
 - Repo names are passed to Octokit's typed `repos.delete({ owner, repo })` method — they are never interpolated into shell commands or URL strings by the route handler.
 - A failure for one repo does not abort the remaining repos; all are attempted and all outcomes are reported.
+
+---
+
+## `GET /api/me`
+
+Returns the authenticated user's GitHub login name. This lightweight endpoint exists for client components that need the session login (e.g., to generate CLI deletion commands) but cannot call `getSession()` directly because `next/headers` is server-only.
+
+**Auth required**: Yes (session cookie)
+
+**Request**: No body or query parameters.
+
+**Success response** (`200`):
+
+```json
+{ "login": "username" }
+```
+
+**Error responses**:
+
+| Status | Body `error` field | Condition |
+|--------|-------------------|-----------|
+| `401` | `"Not authenticated"` | Session cookie is absent or has no `accessToken` |
+
+**Implementation notes**:
+- Only `GET` is exported — other HTTP methods return `405 Method Not Allowed`.
+- The route reads `session.login` from the encrypted cookie and returns it as-is. No GitHub API call is made.
+- The access token is never included in the response.
 
 ---
 
