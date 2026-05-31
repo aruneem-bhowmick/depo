@@ -132,4 +132,89 @@ describe('RepoList', () => {
     // Null description must not produce any visible text or "null" string
     expect(screen.queryByText('null')).not.toBeInTheDocument()
   })
+
+  describe('keyboard interaction', () => {
+    it('toggles selection via Space key on a focused row', () => {
+      render(<RepoList repos={repos} />)
+      // Reach the <li> row that wraps the "Select alpha" checkbox input
+      const alphaRow = screen
+        .getAllByRole('checkbox', { name: /select alpha/i })[0]
+        .closest('li')!
+      fireEvent.keyDown(alphaRow, { key: ' ' })
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+    })
+
+    it('toggles selection via Enter key on a focused row', () => {
+      render(<RepoList repos={repos} />)
+      const alphaRow = screen
+        .getAllByRole('checkbox', { name: /select alpha/i })[0]
+        .closest('li')!
+      fireEvent.keyDown(alphaRow, { key: 'Enter' })
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+    })
+
+    it('deselects a previously-selected repo on a second Space keypress', () => {
+      render(<RepoList repos={repos} />)
+      const alphaRow = screen
+        .getAllByRole('checkbox', { name: /select alpha/i })[0]
+        .closest('li')!
+      fireEvent.keyDown(alphaRow, { key: ' ' })
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      fireEvent.keyDown(alphaRow, { key: ' ' })
+      expect(screen.queryByText(/selected/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('combined search and fork filter', () => {
+    it('applies both filters simultaneously', async () => {
+      render(<RepoList repos={repos} />)
+      // Enable fork toggle so the fork repo (beta) becomes visible
+      await userEvent.click(screen.getByLabelText(/show.*fork/i))
+      expect(screen.getByText('beta')).toBeInTheDocument()
+      // Type a search term that only matches the fork
+      await userEvent.type(screen.getByRole('searchbox'), 'bet')
+      expect(screen.getByText('beta')).toBeInTheDocument()
+      expect(screen.queryByText('alpha')).not.toBeInTheDocument()
+      expect(screen.queryByText('gamma')).not.toBeInTheDocument()
+      // Disabling the fork toggle now leaves zero matches — both filters active
+      await userEvent.click(screen.getByLabelText(/show.*fork/i))
+      expect(screen.queryByText('beta')).not.toBeInTheDocument()
+      expect(screen.getByText(/no repositories match/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('conditional row elements', () => {
+    it('shows the fork badge when the fork toggle is on and the repo is a fork', async () => {
+      render(<RepoList repos={repos} />)
+      expect(screen.queryByText('fork')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByLabelText(/show.*fork/i))
+      expect(screen.getByText('fork')).toBeInTheDocument()
+    })
+
+    it('does not show the fork badge for non-fork repos even when fork toggle is on', async () => {
+      // Only one repo in the list — a non-fork
+      render(<RepoList repos={[makeRepo({ name: 'plain', fork: false })]} />)
+      // Fork toggle is absent (no forks exist), so badge can never appear
+      expect(screen.queryByText('fork')).not.toBeInTheDocument()
+    })
+
+    it('shows star count when stargazerCount is greater than zero', () => {
+      render(<RepoList repos={[makeRepo({ name: 'popular', stargazerCount: 42 })]} />)
+      expect(screen.getByLabelText('42 stars')).toBeInTheDocument()
+    })
+
+    it('does not show a star element when stargazerCount is zero', () => {
+      render(<RepoList repos={[makeRepo({ name: 'quiet', stargazerCount: 0 })]} />)
+      expect(screen.queryByLabelText(/stars/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('select-all edge cases', () => {
+    it('disables the select-all checkbox when no repos are visible', async () => {
+      render(<RepoList repos={repos} />)
+      // Search for something that matches nothing
+      await userEvent.type(screen.getByRole('searchbox'), 'zzz')
+      expect(screen.getByLabelText(/select all/i)).toBeDisabled()
+    })
+  })
 })
