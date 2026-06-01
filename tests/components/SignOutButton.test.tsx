@@ -108,6 +108,30 @@ describe('SignOutButton — failure path (non-2xx response)', () => {
   })
 })
 
+describe('SignOutButton — failure path (non-Error rejection value)', () => {
+  // Exercises the false branch of: err instanceof Error ? err.message : 'Sign-out failed...'
+  // fetch can reject with a plain string or any non-Error value in theory.
+  beforeEach(() => {
+    global.fetch = jest.fn().mockRejectedValue('plain string rejection')
+  })
+
+  it('shows the fallback error message when fetch rejects with a non-Error value', async () => {
+    render(<SignOutButton />)
+    fireEvent.click(screen.getByRole('button'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-out failed. Please try again.')
+  })
+
+  it('does not navigate to / on a non-Error rejection', async () => {
+    render(<SignOutButton />)
+    fireEvent.click(screen.getByRole('button'))
+    await waitFor(() => expect(console.error).toHaveBeenCalled())
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+})
+
 describe('SignOutButton — failure path (network error)', () => {
   beforeEach(() => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Network failure'))
