@@ -176,7 +176,9 @@ Partial failure is not treated as a total failure — all repos in the batch are
 | Body is not an object or `repos` key is missing | `"Body must be { repos: string[] }"` |
 | `repos` array is empty | `"repos array must not be empty"` |
 | `repos` array exceeds 100 items | `"Cannot delete more than 100 repos at once"` |
-| Any entry in `repos` is not a string | `"All entries in repos must be strings"` |
+| Any entry is not a string, is empty/whitespace, or contains a `/` prefix | `"All entries in repos must be non-empty short repo names (no owner/ prefix)"` |
+
+The last validation rule checks three conditions simultaneously: the entry must be a string (`typeof r === 'string'`), must not be blank after trimming (`r.trim().length > 0`), and must not contain a forward slash (`!r.includes('/')`) — the slash check prevents callers from accidentally submitting full `owner/repo` values instead of the expected short name.
 
 **Authentication error** (`401`):
 
