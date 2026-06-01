@@ -115,8 +115,8 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 | Key (`lib/constants.ts`) | Type | Set by | Read by | Cleared by |
 |--------------------------|------|--------|---------|------------|
-| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` in `handleDeletionComplete` — after the `POST /api/delete` response arrives and before navigation to `/done` |
-| `depo:results` | `DeletionResult[]` | `/confirm` after the `POST /api/delete` response | `/done` on mount | `/done` on mount |
+| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` in `handleDeletionComplete` (primary path — before navigating to `/done`); also cleared by `/done` on mount as a safety net for any edge case where the key was not removed by `/confirm` |
+| `depo:results` | `DeletionResult[]` | `/confirm` in `handleDeletionComplete`, after the `POST /api/delete` response | `/done` on mount | `/done` on mount, immediately after parsing — prevents stale results from showing on a manual refresh |
 
 ### HTTP Cookie (server-side, httpOnly)
 
