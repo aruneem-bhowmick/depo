@@ -84,6 +84,18 @@ describe('DeleteProgress', () => {
     expect(onComplete).not.toHaveBeenCalled()
   })
 
+  it('shows fallback error message when non-ok response body has no error field', async () => {
+    // Exercises the null-coalescing branch: errData.error ?? 'Deletion failed...'
+    // when the server returns a non-2xx status with a body that contains no error key.
+    ;(global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    })
+    render(<DeleteProgress repos={['r1']} onComplete={jest.fn()} />)
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent('Deletion failed. Please try again.')
+  })
+
   it('calls POST /api/delete with the repos array', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ results: [] }) })
     render(<DeleteProgress repos={['a', 'b']} onComplete={jest.fn()} />)

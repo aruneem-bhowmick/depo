@@ -129,6 +129,21 @@ describe('RepoList', () => {
     expect(screen.queryByText(/NaN/)).not.toBeInTheDocument()
   })
 
+  it('renders "Nmo ago" for timestamps between 30 and 364 days old', () => {
+    // 40 days × 24h × 60m × 60s × 1000ms = 3,456,000,000 ms
+    const fortyDaysAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString()
+    render(<RepoList repos={[makeRepo({ name: 'month-old', updatedAt: fortyDaysAgo })]} />)
+    // 40 days / 30 = 1.33 months → "1mo ago"
+    expect(screen.getByText('1mo ago')).toBeInTheDocument()
+  })
+
+  it('renders "Ny ago" for timestamps older than 12 months', () => {
+    // 400 days covers the years branch: floor(400/30)=13 months ≥ 12 → floor(13/12)=1 year
+    const fourHundredDaysAgo = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString()
+    render(<RepoList repos={[makeRepo({ name: 'year-old', updatedAt: fourHundredDaysAgo })]} />)
+    expect(screen.getByText('1y ago')).toBeInTheDocument()
+  })
+
   it('shows description when present', () => {
     render(<RepoList repos={[makeRepo({ description: 'My cool project' })]} />)
     expect(screen.getByText('My cool project')).toBeInTheDocument()
@@ -138,6 +153,27 @@ describe('RepoList', () => {
     render(<RepoList repos={[makeRepo({ description: null })]} />)
     // Null description must not produce any visible text or "null" string
     expect(screen.queryByText('null')).not.toBeInTheDocument()
+  })
+
+  describe('inner checkbox direct interaction', () => {
+    it('clicking the inner checkbox input selects the repo via onChange without double-toggling', () => {
+      render(<RepoList repos={repos} />)
+      // Get the actual <input type="checkbox"> element (not the <li>)
+      // The stopPropagation on its onClick prevents the parent <li> click from also firing,
+      // so selection toggles exactly once (to selected), not twice (back to unselected).
+      const innerCheckbox = screen.getByLabelText('Select alpha')
+      fireEvent.click(innerCheckbox)
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+    })
+
+    it('clicking the inner checkbox a second time deselects the repo', () => {
+      render(<RepoList repos={repos} />)
+      const innerCheckbox = screen.getByLabelText('Select alpha')
+      fireEvent.click(innerCheckbox)
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      fireEvent.click(innerCheckbox)
+      expect(screen.queryByText(/selected/i)).not.toBeInTheDocument()
+    })
   })
 
   describe('keyboard interaction', () => {

@@ -190,21 +190,34 @@ interface DeleteProgressProps {
 | State | Type | Default | Purpose |
 |-------|------|---------|---------|
 | `results` | `DeletionResult[] \| null` | `null` | API response; `null` while in flight |
-| `error` | `string \| null` | `null` | Set if the `fetch` itself throws (network error) |
+| `error` | `string \| null` | `null` | Set on network failure or a non-ok HTTP response |
+
+**Render phases**:
+
+| Condition | Rendered output |
+|-----------|----------------|
+| `error !== null` | `<div role="alert">` containing the error message |
+| `results === null` (in-flight) | Indeterminate progress bar + count label |
+| `results !== null` (complete) | `<ul>` with one `<li>` per repo, per-row status icon |
 
 **Behavior**:
-- On mount (`useEffect` with empty dependency array), immediately sends `POST /api/delete` with `{ repos }`. The effect runs exactly once — no re-fires.
-- While awaiting the response: renders an indeterminate progress bar (`role="progressbar"`, `aria-label="Deleting repositories…"`) and a count label.
-- **HTTP status check**: after `fetch` resolves, `res.ok` is checked before parsing the body. If the status is non-2xx (e.g., `401 Not authenticated`, `400 Invalid body`), the error body is parsed and `setError(errData.error ?? 'Deletion failed. Please try again.')` is called; `setResults` and `onComplete` are never reached.
-- After a successful (`res.ok`) response: renders each repo as a list item with a per-row status icon.
-  - Green checkmark SVG (`aria-label="Deleted"`) for `status: 'deleted'`.
-  - Red X SVG (`aria-label="Error"`) for `status: 'error'`, with the `DeletionResult.error` string rendered in smaller red text below the repo name.
-- Calls `onComplete(results)` immediately after updating state so the parent can persist results and navigate to `/done`.
-- **Error paths** — both render a `role="alert"` box and never call `onComplete`:
-  - `fetch` throws (network failure, DNS error, request timeout).
-  - `fetch` resolves with a non-ok HTTP status (e.g., session expired, validation error).
+- On mount (`useEffect` with empty dependency array), immediately sends `POST /api/delete` with `{ repos }`. The effect runs exactly once — the empty dependency array ensures no re-fires if the parent re-renders.
+- **In-flight state** (`results === null`): renders an indeterminate progress bar (`role="progressbar"`, `aria-label="Deleting repositories…"`) and a count label (`"Deleting N repository/repositories…"`).
+- **HTTP status check** (`res.ok`): after `fetch` resolves, `res.ok` is checked before parsing the results body. If the status is non-2xx (e.g., `401 Not authenticated`, `400 Invalid body`), the error body is parsed for an `error` field. If the field is absent the fallback string `'Deletion failed. Please try again.'` is used. `setResults` and `onComplete` are never reached in this path.
+- **Success path** (`res.ok === true`): parses `{ results: DeletionResult[] }` from the body, calls `setResults(data.results)` then immediately calls `onComplete(data.results)`. The parent is responsible for persisting results to `sessionStorage` and navigating to `/done`.
+- **Per-repo status icons**:
+  - Green checkmark SVG (`aria-label="Deleted"`) for `status: 'deleted'`
+  - Red X SVG (`aria-label="Error"`) for `status: 'error'`, with `DeletionResult.error` rendered below the repo name in `text-xs text-red-500`
+- **Error paths** — both render a `role="alert"` box and never invoke `onComplete`:
+  - `fetch` throws: network failure, DNS error, request timeout
+  - `fetch` resolves with a non-ok HTTP status: session expired, validation failure, server error
 
-**Notes**: `/api/delete` returns a single response after all deletions complete server-side. Per-repo streaming via Server-Sent Events is a future enhancement (see [ROADMAP.md](ROADMAP.md)).
+**Design decisions**:
+- The empty `useEffect` dependency array is intentional and documented with `// eslint-disable-next-line react-hooks/exhaustive-deps`. The deletion request is a one-shot side effect that must not fire again if `repos` changes (which it cannot in practice — the parent does not mutate the array after mount).
+- `onComplete` is called synchronously after `setResults` rather than in a separate effect. This avoids an extra render cycle before the parent navigates away.
+- The `res.ok` check is an enhancement over the minimal spec: it catches HTTP-level errors (authentication failures, server-side validation) that the `try/catch` alone would not, because `fetch` only rejects on network errors, not on non-2xx status codes.
+
+**Notes**: `/api/delete` returns a single response after all server-side deletions complete. Per-repo streaming via Server-Sent Events is a future enhancement (see [ROADMAP.md](ROADMAP.md)).
 
 ---
 
@@ -227,18 +240,41 @@ interface CommandOutputProps {
 
 | State | Type | Default | Purpose |
 |-------|------|---------|---------|
-| `copied` | `boolean` | `false` | Drives the "Copied!" / "Copy" button label |
+| `copied` | `boolean` | `false` | Drives the "Copied!" / "Copy" button label and aria-label |
 
 **Behavior**:
-- Displays the command in a `<pre><code>` block styled with a dark background (`bg-zinc-900 text-zinc-100`). The `<pre>` preserves whitespace and newlines from multi-line generated scripts.
-- "Copy" button (top-right, absolutely positioned) calls `navigator.clipboard.writeText(command)`. On success: flips label to "Copied!" for exactly 2 seconds then reverts. On failure (non-HTTPS context, browser permission denied): silently swallowed — label does not change.
-- For `mode === 'curl'`, renders a yellow `role="note"` informational banner above the code block:
+- Displays the command in a `<pre><code>` block styled with a dark background (`bg-zinc-900 text-zinc-100`). The `<pre>` element preserves whitespace and newlines so multi-line `curl` and `gh` scripts render correctly without collapsing into a single line.
+- **Copy button** (absolutely positioned at top-right of the code block, `z-10` to sit above the `<pre>`): calls `navigator.clipboard.writeText(command)`.
+  - **On success**: sets `copied = true`. The button label switches from "Copy" to "Copied!" and `aria-label` switches from `"Copy command"` to `"Copied!"`. A `setTimeout(..., 2000)` resets `copied` to `false` after 2 seconds.
+  - **On failure** (non-HTTPS context, browser permission denied, clipboard API unavailable): the error is silently swallowed — the button label does not change and no error is surfaced to the user. This is a best-effort feature.
+- **Curl warning banner**: for `mode === 'curl'` only, renders a yellow `role="note"` banner above the code block with the text:
 
   > "This command uses `<your-token>` as a placeholder. Replace it with a GitHub personal access token that has `delete_repo` scope before running. Do not store tokens in shell history."
 
-  The banner uses `role="note"` (not `role="alert"`) — it is informational, not urgent, and must not interrupt screen readers unexpectedly.
+  The banner is absent for `mode === 'gh'`.
+- For `mode === 'gh'`, no banner is shown — the GitHub CLI handles authentication from its own keychain.
 
-**Accessibility**: the copy button carries `aria-label` set to `"Copied!"` when in the copied state and `"Copy command"` otherwise, so screen readers announce the current action.
+**Rendered structure**:
+
+```
+<div>
+  [curl warning — mode="curl" only]
+  <div class="relative rounded-md ...">
+    <button aria-label="Copy command | Copied!">Copy | Copied!</button>
+    <pre><code>{command}</code></pre>
+  </div>
+</div>
+```
+
+**Accessibility**:
+- The copy button carries `aria-label="Copy command"` at rest and `aria-label="Copied!"` after a successful copy, so screen readers announce the current action when the element receives focus.
+- `role="note"` on the curl banner conveys that the information is supplementary rather than urgent. `role="alert"` would force screen readers to immediately interrupt — inappropriate for a static instructional note that the user can read at their own pace.
+- `<pre><code>` preserves the semantic meaning of the content as a code block for assistive technologies and browser developer tools.
+
+**Design decisions**:
+- The `handleCopy` function is `async` because `navigator.clipboard.writeText` returns a `Promise`. The try/catch wraps the entire async path so both synchronous errors (clipboard API absent) and promise rejections (permission denied) are swallowed gracefully.
+- The 2-second "Copied!" window is a widely-used UX convention that gives users enough time to confirm the copy succeeded without the button staying in the copied state for an annoying duration.
+- The copy button is `z-10` and absolutely positioned rather than placed in the document flow to avoid the `<pre>` element needing padding-right adjustments for variable-width commands.
 
 ---
 
