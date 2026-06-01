@@ -32,6 +32,7 @@ test.describe('Full Depo flow (E2E)', () => {
           value: process.env.TEST_SESSION_COOKIE ?? '',
           domain: 'localhost',
           path: '/',
+          expires: -1,
           httpOnly: true,
           secure: false,
           sameSite: 'Lax',

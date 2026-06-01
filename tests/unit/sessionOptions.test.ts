@@ -28,13 +28,11 @@ describe('SESSION_SECRET validation', () => {
 
   afterEach(() => {
     process.env.SESSION_SECRET = originalSecret
-    jest.resetModules()
   })
 
-  it('throws if SESSION_SECRET is not defined', async () => {
+  it('throws when password is accessed without SESSION_SECRET', () => {
     delete process.env.SESSION_SECRET
-    jest.resetModules()
-    await expect(import('@/lib/sessionOptions')).rejects.toThrow(
+    expect(() => sessionOptions.password).toThrow(
       'SESSION_SECRET environment variable is required',
     )
   })
