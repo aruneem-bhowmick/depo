@@ -1,10 +1,10 @@
 # Security
 
-Depo is a destructive-action tool — it holds a `delete_repo`-scoped GitHub token and can permanently remove repositories. This document explains the security decisions made to protect that token and the user's account.
+Depo is a destructive-action tool — it holds a `delete_repo`-scoped GitHub token and can permanently remove repositories. The sections below document the security decisions behind token storage, CSRF protection, input validation, and session management.
 
 ---
 
-## Token Storage
+## Token storage
 
 The GitHub OAuth access token is stored exclusively in an `iron-session` encrypted HTTP-only cookie (`depo_session`).
 
@@ -16,7 +16,7 @@ The GitHub OAuth access token is stored exclusively in an `iron-session` encrypt
 
 ---
 
-## SESSION_SECRET Startup Validation
+## SESSION_SECRET startup validation
 
 `lib/sessionOptions.ts` reads `process.env.SESSION_SECRET` at **module load time** — outside any function, at the top level of the module. If the variable is absent or empty, the module throws immediately:
 
@@ -28,7 +28,7 @@ A deployment that starts without `SESSION_SECRET` set will crash before serving 
 
 ---
 
-## CSRF Protection on OAuth Callback
+## CSRF protection on OAuth callback
 
 The OAuth flow uses the `state` parameter (required by [RFC 6749 §10.12](https://datatracker.ietf.org/doc/html/rfc6749#section-10.12)) to prevent cross-site request forgery on the authorization callback.
 
@@ -57,7 +57,7 @@ This design ensures that only the browser instance that initiated the sign-in re
 
 ---
 
-## Network-Layer Resilience in the OAuth Callback
+## Network-layer resilience in the OAuth callback
 
 Beyond CSRF and response-content validation, the callback route is hardened against infrastructure-level failures that could otherwise crash the serverless function:
 
@@ -71,7 +71,7 @@ Every failure path, at every layer, redirects to `/?error=auth_failed`. The rout
 
 ---
 
-## Protected Route Middleware
+## Protected route middleware
 
 Next.js middleware (`middleware.ts`) enforces authentication at the routing layer, before any server component or API route handler executes on the protected paths.
 
@@ -81,7 +81,7 @@ Next.js middleware (`middleware.ts`) enforces authentication at the routing laye
 
 ---
 
-## Scope Minimization
+## Scope minimization
 
 Depo requests the minimum GitHub OAuth scopes required:
 
@@ -94,7 +94,7 @@ The `repo` scope (which grants full access to private repositories) is **not req
 
 ---
 
-## Input Validation on the Delete Route
+## Input validation on the delete route
 
 The `POST /api/delete` body is validated before any GitHub API calls are made:
 
@@ -107,7 +107,7 @@ Repo names are passed directly to Octokit's typed `repos.delete({ owner, repo })
 
 ---
 
-## Rate Limiting Strategy
+## Rate limiting strategy
 
 GitHub enforces secondary rate limits on destructive operations. Two measures protect against hitting them:
 
@@ -118,7 +118,7 @@ Deletions are strictly sequential — `Promise.all` is explicitly avoided. GitHu
 
 ---
 
-## Session Expiry and Token Revocation
+## Session expiry and token revocation
 
 If a session expires or the user revokes Depo's OAuth access on GitHub:
 
@@ -131,7 +131,7 @@ Users can also revoke access at any time via **GitHub → Settings → Applicati
 
 ---
 
-## Landing Page Error Display
+## Landing page error display
 
 The landing page (`app/page.tsx`) is the designated recovery point for all failure paths in the OAuth flow. All API routes and the OAuth callback redirect to `/` (with an `?error=` query parameter) rather than returning `4xx`/`5xx` responses directly, so users always land on a page that can display a meaningful recovery message.
 
