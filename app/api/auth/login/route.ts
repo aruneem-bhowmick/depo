@@ -24,7 +24,7 @@ import { randomBytes } from 'crypto'
  */
 export async function GET(request: NextRequest) {
   const clientId = process.env.GITHUB_CLIENT_ID
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
 
   if (!clientId || !appUrl) {
     const missing = [
