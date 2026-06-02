@@ -487,13 +487,13 @@ SESSION_KEY_OAUTH_STATE = 'depo:oauth_state'
 
 Exports the `iron-session` configuration and the `SessionData` type. Kept separate from `lib/session.ts` so that API routes and server components can import the options without pulling in `next/headers`.
 
-`lib/sessionOptions.ts` also validates `SESSION_SECRET` at **module load time**: if `process.env.SESSION_SECRET` is absent or empty, the module throws immediately:
+`lib/sessionOptions.ts` exposes `SESSION_SECRET` validation through a **lazy `get password()` getter**. The getter is only invoked when iron-session reads the password during an actual session operation (read, write, or destroy). If `process.env.SESSION_SECRET` is absent at that point, the getter throws:
 
 ```
 Error: SESSION_SECRET environment variable is required
 ```
 
-This fail-fast behaviour prevents a misconfigured deployment from serving requests with a broken or empty encryption key that would make session cookies trivially forgeable.
+Deferring the check to access time — rather than module import time — allows `next build` to succeed in environments where `SESSION_SECRET` is not available as a build-time variable, while still failing loudly before any session operation is performed with a missing key.
 
 ---
 
