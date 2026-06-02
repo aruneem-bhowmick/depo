@@ -63,10 +63,11 @@ test.describe('Full Depo flow (E2E)', () => {
   })
 
   test('/confirm shows the selected repo and ConfirmGate', async ({ page }) => {
+    const repoName = process.env['TEST_REPO_NAME'] ?? ''
     await page.goto('/repos')
-    await page.evaluate(() => {
-      sessionStorage.setItem('depo:selected', JSON.stringify([process.env['TEST_REPO_NAME']]))
-    })
+    await page.evaluate((name: string) => {
+      sessionStorage.setItem('depo:selected', JSON.stringify([name]))
+    }, repoName)
     await page.goto('/confirm')
     await expect(page.getByRole('heading')).toContainText('1 repository')
     await expect(page.locator('[data-testid=confirm-gate], input[placeholder]')).toBeVisible()
