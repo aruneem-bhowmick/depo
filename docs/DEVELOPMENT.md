@@ -27,7 +27,7 @@ npm test -- --coverage    # generate coverage report
 ```
 tests/
 ├── unit/
-│   ├── config.test.ts          next.config.ts image domain validation
+│   ├── config.test.ts          next.config.js image domain validation
 │   ├── constants.test.ts       constants values and key uniqueness
 │   ├── generateCommand.test.ts gh and curl command generation (14 cases)
 │   ├── github.test.ts          createOctokit, listPublicRepos, deleteRepo
@@ -52,6 +52,7 @@ tests/
     ├── Layout.test.tsx          Nav bar structure: wordmark link, authenticated user section, unauthenticated state (8 cases)
     ├── LandingPage.test.tsx     Landing page: headline, OAuth link target, error alerts, authenticated redirect (7 cases)
     ├── RepoList.test.tsx        RepoList: fork toggle, search filter, inner checkbox direct-click, keyboard selection, combined filters, row element rendering, relativeTime NaN guard, relativeTime months/year thresholds, select-all edge cases, Continue flow (28 cases)
+    ├── DonePage.test.tsx        /done page: sessionStorage-empty redirect, green/amber count colour, singular count, failed repos section, storage cleared on mount, "Delete more" navigation, "Sign out" fetch+navigation (9 cases)
     ├── ReposPage.test.tsx       /repos page: heading render, repos forwarded to RepoList, empty repos (0 count), error alert, Try again link href, RepoList absent on error (6 cases)
     └── SignOutButton.test.tsx   Render, click handler, success navigation, non-2xx error path, network error path, non-Error rejection fallback (17 cases)
 ```
@@ -85,6 +86,8 @@ tests/
 **Coverage note for `ConfirmGate.tsx` line 73** (`if (loading) return`): React 18 suppresses `onClick` handlers on disabled form elements even when the click is dispatched programmatically via `fireEvent.click`. Because the delete button is rendered with `disabled={loading}`, the `handleSubmit` function is not invoked by `fireEvent.click` while `loading=true` — React drops the event before calling the handler. The existing test therefore passes (correctly asserting `onConfirm` was not called) but through event suppression rather than the `if (loading) return` guard. This defensive guard exists as a safety net for any accessibility tool or future code path that invokes `handleSubmit` outside the React synthetic-event system. It is intentionally not covered by the current test suite because doing so would require bypassing React's disabled-button event suppression, which is not straightforward in jsdom without patching internal React behaviour.
 
 `SignOutButton.test.tsx` mocks `next/navigation` (providing `useRouter` with `push` and `refresh` stubs), spies on `console.error`, and sets `global.fetch` per describe block. The suite is split into four groups: **success path** (7 cases) — button render, `POST /api/signout` is called, fetch fires exactly once, `router.push('/')` is called, `router.refresh()` is called, focus-ring classes are present, no error alert is shown; **non-2xx failure** (4 cases) — navigation is suppressed when `response.ok` is false, `router.refresh()` is not called, an error `<span role="alert">` appears containing the HTTP status, `console.error` is called with the `[SignOutButton]` prefix; **network error** (4 cases) — same navigation-suppression and alert checks when `fetch` rejects entirely; **non-Error rejection** (2 cases) — exercises the false branch of `err instanceof Error ? err.message : 'Sign-out failed...'` by rejecting with a plain string value, asserting the fallback message appears and navigation is suppressed.
+
+`DonePage.test.tsx` sets `global.fetch = jest.fn().mockResolvedValue({ ok: true })` at the module level so the "Sign out" button's `fetch('/api/signout', ...)` call resolves without a network request. `sessionStorage` is cleared in `beforeEach` and all mocks are reset with `jest.clearAllMocks()`. The helper `setResults()` writes a `DeletionResult[]` to `sessionStorage['depo:results']` and is called by every test that needs a non-empty done page. The suite covers: `router.replace('/')` when `sessionStorage` is empty; `text-green-*` class on the count element when all results have `status: 'deleted'`; `text-amber-*` class when at least one result has `status: 'error'`; singular "repository" text when `deleted.length === 1`; failed-repos section showing repo name and `DeletionResult.error` text when errors exist; absence of the "Failed deletions" section when all succeed; both `depo:results` and `depo:selected` keys removed from `sessionStorage` after the component mounts; `router.push('/repos')` called when "Delete more" is clicked; `fetch` called with `('/api/signout', { method: 'POST' })` and `router.push('/')` called when "Sign out" is clicked.
 
 `Layout.test.tsx` exercises the nav bar's structural contract via an inline `Nav` component (the real `RootLayout` is an async server component that requires `next/headers` and cannot be driven by Jest directly). The suite covers: the Depo wordmark link pointing to `/`; login name visibility when authenticated vs. unauthenticated; sign-out button visibility; GitHub avatar rendering when `avatarUrl` is provided vs. omitted; and that the unauthenticated state renders no user-section elements.
 
@@ -133,7 +136,21 @@ npx playwright test --ui     # interactive UI mode
 
 **Playwright configuration**: `config/playwright.config.ts` — Chromium only, `baseURL: http://localhost:3000`. The E2E suite covers full user flows: sign-in, repo selection, confirm, deletion, and summary.
 
-> E2E tests require the app to be running (`npm run dev`) and a valid `.env.local` configured with real GitHub OAuth credentials.
+**E2E test file**: `tests/e2e/flow.spec.ts`
+
+The suite is split into two describe blocks:
+
+- **`Full Depo flow (E2E)`** — destructive golden-path tests that require real credentials. Guarded by `test.skip(!HAS_E2E, ...)` where `HAS_E2E = !!(TEST_SESSION_COOKIE && TEST_REPO_NAME)`. All tests in this block inject a real `depo_session` cookie via Playwright's `storageState` option. Covers: authenticated landing page redirect to `/repos`, repo list loading, repo selection and `/confirm` navigation, `/confirm` rendering the selection with `ConfirmGate`, sign-out clearing session and redirecting to `/`.
+- **`Landing page (unauthenticated)`** — non-destructive UI tests that run without any credentials. Covers: headline and sign-in link visibility, `?error=auth_failed` alert rendering, `?error=session_expired` alert rendering.
+
+**Required environment variables for the authenticated block**:
+
+| Variable | Description |
+|----------|-------------|
+| `TEST_SESSION_COOKIE` | Encrypted `depo_session` iron-session cookie value for a real GitHub test account |
+| `TEST_REPO_NAME` | Short name of a public repository in that account that can safely be deleted |
+
+> E2E tests require the app to be running (`npm run dev`) and a valid `.env.local` configured with real GitHub OAuth credentials. The unauthenticated landing-page tests run without credentials and do not require the app to be signed in.
 
 ---
 

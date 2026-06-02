@@ -125,6 +125,86 @@ The confirmation and execution page. Reads the repo selection from `sessionStora
 
 ---
 
+### Done Page (`app/done/page.tsx`)
+
+**File**: `app/done/page.tsx`
+
+**Type**: Client component (`'use client'`)
+
+The final summary page rendered after a bulk deletion completes. Displays how many repositories were deleted, lists any that failed, and provides two exit actions.
+
+**State**:
+
+| State | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `results` | `DeletionResult[] \| null` | `null` | Parsed deletion results from `sessionStorage`; `null` while mounting |
+| `mounted` | `boolean` | `false` | Guards against server/client hydration mismatch — renders `null` until `true` |
+
+**Mount behavior** (`useEffect([router])`):
+1. Reads `sessionStorage[SESSION_KEY_RESULTS]`. If the key is absent, immediately calls `router.replace('/')` and returns without setting `mounted`.
+2. Parses the JSON. If parsing throws, calls `router.replace('/')` and returns.
+3. On success: calls `setResults(parsed)`, removes both `SESSION_KEY_RESULTS` **and** `SESSION_KEY_SELECTED` from `sessionStorage`, then sets `mounted = true`.
+
+**Clearing both keys on mount** is intentional: `SESSION_KEY_RESULTS` is consumed (no reason to re-display the same deletion summary on refresh), and `SESSION_KEY_SELECTED` is stale (the selection was already processed). Clearing them prevents the user from returning to `/confirm` with stale data.
+
+**Derived values** (computed synchronously from `results` before render):
+- `deleted` — results where `status === 'deleted'`
+- `failed` — results where `status === 'error'`
+- `allSucceeded` — `failed.length === 0`
+
+**Summary count display**:
+- Renders `"{N} repository/repositories deleted"` in a `<p>` element.
+- Class is `text-green-600 dark:text-green-400` when `allSucceeded === true`.
+- Class is `text-amber-600 dark:text-amber-400` when any deletions failed.
+- Uses singular "repository" when `deleted.length === 1`, plural "repositories" otherwise.
+- When `!allSucceeded`, a secondary `<p>` renders: `"{M} repository/repositories could not be deleted."` in `text-zinc-500`.
+
+**Failed deletions section** (only rendered when `failed.length > 0`):
+- Headed by `"Failed deletions"` in `text-sm font-medium`.
+- A `<ul>` with one `<li>` per failed repo containing the monospace repo name and the `DeletionResult.error` string in `text-xs text-red-500`.
+
+**Actions**:
+
+| Button | Handler | Effect |
+|--------|---------|--------|
+| "Delete more" | `router.push('/repos')` | Navigates to the repo selection page for a fresh batch |
+| "Sign out" | `handleSignOut()` | Sends `POST /api/signout`, then `router.push('/')` + `router.refresh()` |
+
+**`handleSignOut()`**: `await`s the fetch so the function suspends until the server has destroyed the session cookie before navigating. `router.refresh()` causes the root layout to re-render without session data, removing the nav user section immediately without a full page reload.
+
+**Rendered elements**:
+
+```
+<div>
+  <p class="text-3xl … text-green-600|text-amber-600">N repositories deleted</p>
+  [<p class="text-zinc-500">M repositories could not be deleted.</p>]      (partial failure only)
+  [<div>
+    <p>Failed deletions</p>
+    <ul>
+      <li> repo-name / error-message </li>
+      …
+    </ul>
+  </div>]                                                                    (partial failure only)
+  <div>
+    <button>Delete more</button>
+    <button>Sign out</button>
+  </div>
+</div>
+```
+
+**Test coverage**: `tests/components/DonePage.test.tsx` (9 tests):
+- Redirect when `sessionStorage` is empty
+- Green colour for all-success result
+- Amber colour for partial-failure result
+- Singular vs plural count text
+- Failed repos section renders repo name and error
+- Failed repos section absent when all succeed
+- Both storage keys cleared after reading
+- "Delete more" navigates to `/repos`
+- "Sign out" calls `POST /api/signout` then navigates to `/`
+
+---
+
 ## React Components
 
 All five components are client components (`'use client'`). They are rendered inside server component page shells that pass data as props.
@@ -407,13 +487,13 @@ SESSION_KEY_OAUTH_STATE = 'depo:oauth_state'
 
 Exports the `iron-session` configuration and the `SessionData` type. Kept separate from `lib/session.ts` so that API routes and server components can import the options without pulling in `next/headers`.
 
-`lib/sessionOptions.ts` also validates `SESSION_SECRET` at **module load time**: if `process.env.SESSION_SECRET` is absent or empty, the module throws immediately:
+`lib/sessionOptions.ts` exposes `SESSION_SECRET` validation through a **lazy `get password()` getter**. The getter is only invoked when iron-session reads the password during an actual session operation (read, write, or destroy). If `process.env.SESSION_SECRET` is absent at that point, the getter throws:
 
 ```
 Error: SESSION_SECRET environment variable is required
 ```
 
-This fail-fast behaviour prevents a misconfigured deployment from serving requests with a broken or empty encryption key that would make session cookies trivially forgeable.
+Deferring the check to access time — rather than module import time — allows `next build` to succeed in environments where `SESSION_SECRET` is not available as a build-time variable, while still failing loudly before any session operation is performed with a missing key.
 
 ---
 

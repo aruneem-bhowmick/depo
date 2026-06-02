@@ -115,8 +115,8 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 | Key (`lib/constants.ts`) | Type | Set by | Read by | Cleared by |
 |--------------------------|------|--------|---------|------------|
-| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` in `handleDeletionComplete` — after the `POST /api/delete` response arrives and before navigation to `/done` |
-| `depo:results` | `DeletionResult[]` | `/confirm` after the `POST /api/delete` response | `/done` on mount | `/done` on mount |
+| `depo:selected` | `string[]` (short repo names — never `owner/repo` form) | `RepoList` "Continue →" button on `/repos` | `/confirm` on mount | `/confirm` in `handleDeletionComplete` (primary path — before navigating to `/done`); also cleared by `/done` on mount as a safety net for any edge case where the key was not removed by `/confirm` |
+| `depo:results` | `DeletionResult[]` | `/confirm` in `handleDeletionComplete`, after the `POST /api/delete` response | `/done` on mount | `/done` on mount, immediately after parsing — prevents stale results from showing on a manual refresh |
 
 ### HTTP Cookie (server-side, httpOnly)
 
@@ -132,7 +132,7 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 `app/layout.tsx` is the root server component that wraps every page. It:
 
-- Loads the **Inter** font via `next/font/google` and applies it to `<body>` so the typeface is self-hosted (no third-party font request at runtime).
+- Applies the **system UI font stack** via Tailwind's `font-sans` utility on `<body>` — no external font request at build or runtime.
 - Inlines a **dark-mode initialisation script** synchronously in `<head>`. The script checks `window.matchMedia('(prefers-color-scheme: dark)')` and adds the `dark` class to `<html>` before the first paint, preventing a flash of unstyled content. `suppressHydrationWarning` is set on `<html>` to suppress the React hydration warning that would otherwise appear because the class is added by a non-React script.
 - Calls `getSession()` server-side and renders a **navigation bar** with the Depo wordmark (left) and — when `session.accessToken` is present — the user's GitHub avatar (24×24 circle), login name, and `<SignOutButton />` (right).
 - Wraps page content in `<main className="max-w-2xl mx-auto px-4 py-8">` — the same `max-w-2xl` constraint used by the header inner div ensures consistent narrow-width layout on all pages.
@@ -193,7 +193,7 @@ depo/
 └── config/                         Jest, Playwright, Tailwind configuration
 ```
 
-**`next.config.ts`**: written in TypeScript (not `.mjs`). Configured with `images.domains: ['avatars.githubusercontent.com']` to allow Next.js image optimization for GitHub user avatars.
+**`next.config.js`**: CommonJS configuration file. Configured with `images.domains: ['avatars.githubusercontent.com']` to allow Next.js image optimization for GitHub user avatars.
 
 **`config/tailwind.config.ts`**: Tailwind configuration. Key settings:
 - `darkMode: 'class'` — dark mode is toggled by the `dark` class on `<html>`, set by the inline layout script.

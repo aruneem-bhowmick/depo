@@ -1,12 +1,9 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { getSession } from '@/lib/session'
 import { SignOutButton } from '@/components/SignOutButton'
 import Image from 'next/image'
 import Link from 'next/link'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Depo',
@@ -17,8 +14,8 @@ export const metadata: Metadata = {
  * Root layout for the entire Depo application.
  *
  * Renders the persistent shell: the `<html>` element with a dark-mode
- * initialisation script (prevents FOUC), the Inter font body, a top navigation
- * bar, and the `<main>` content area.
+ * initialisation script (prevents FOUC), a Tailwind `font-sans` body, a top
+ * navigation bar, and the `<main>` content area.
  *
  * The navigation bar shows the Depo wordmark on the left and — when the user is
  * authenticated — their GitHub avatar, login name, and a sign-out button on the
@@ -45,7 +42,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.className} antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen`}>
+      <body className="font-sans antialiased bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen">
         <header className="border-b border-zinc-200 dark:border-zinc-800">
           <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
             <Link
