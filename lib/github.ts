@@ -24,7 +24,7 @@ export function createOctokit(token: string): Octokit {
 export async function listPublicRepos(token: string): Promise<Repo[]> {
   const octokit = createOctokit(token)
   const raw = await octokit.paginate(octokit.repos.listForAuthenticatedUser, {
-    type: 'owner',
+    affiliation: 'owner',
     visibility: 'public',
     sort: 'updated',
     direction: 'desc',

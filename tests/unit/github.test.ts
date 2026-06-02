@@ -55,7 +55,7 @@ describe('listPublicRepos()', () => {
     await listPublicRepos('tok')
     expect(mockOctokit.paginate).toHaveBeenCalledWith(
       mockOctokit.repos.listForAuthenticatedUser,
-      expect.objectContaining({ type: 'owner', visibility: 'public', sort: 'updated' }),
+      expect.objectContaining({ affiliation: 'owner', visibility: 'public', sort: 'updated' }),
     )
   })
 
