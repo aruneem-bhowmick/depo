@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide covers everything you need to run Depo locally and deploy it to production.
+This guide covers local setup and production deployment.
 
 ---
 
@@ -12,7 +12,7 @@ This guide covers everything you need to run Depo locally and deploy it to produ
 
 ---
 
-## 1. Create a GitHub OAuth App
+## 1. Create a GitHub OAuth app
 
 Depo authenticates users via GitHub OAuth and requests `public_repo` + `delete_repo` scopes.
 
@@ -33,7 +33,7 @@ Depo authenticates users via GitHub OAuth and requests `public_repo` + `delete_r
 
 ---
 
-## 2. Clone and Install
+## 2. Clone and install
 
 ```bash
 git clone https://github.com/AruneemB/depo.git
@@ -43,7 +43,7 @@ npm install
 
 ---
 
-## 3. Configure Environment Variables
+## 3. Configure environment variables
 
 ```bash
 cp .env.example .env.local
@@ -69,7 +69,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ---
 
-## 4. Run Locally
+## 4. Run locally
 
 ```bash
 npm run dev
@@ -87,7 +87,7 @@ If anything goes wrong (state mismatch, bad code, network error), you are redire
 
 ---
 
-## Configuration Notes
+## Configuration notes
 
 **`next.config.ts` uses TypeScript**: Depo's Next.js config file is `next.config.ts`, not `next.config.mjs`. Do not rename it — the ts-jest path alias resolution and TypeScript tooling expect the `.ts` extension.
 
