@@ -2,7 +2,7 @@
 
 ---
 
-## Running the App
+## Running the app
 
 ```bash
 npm run dev      # start Next.js dev server at http://localhost:3000
@@ -14,7 +14,7 @@ npm start        # serve production build locally
 
 ## Testing
 
-### Unit and Integration Tests (Jest)
+### Unit and integration tests (Jest)
 
 ```bash
 npm test                  # run all Jest tests once
@@ -95,7 +95,7 @@ tests/
 
 `RepoList.test.tsx` mocks `next/navigation` (providing a `useRouter` stub with a `push` spy) and clears `sessionStorage` between each test. A `makeRepo()` fixture builder produces `Repo` objects with sensible defaults and per-field overrides; fixture IDs are assigned by an auto-incrementing `idCounter` (reset to 1 at the top of `beforeEach`) rather than `Math.random()`. The shared `repos` array (alpha / beta-fork / gamma) is also re-created in `beforeEach` immediately after the counter reset, so alpha always gets id=1, beta id=2, gamma id=3 without needing explicit overrides, and no test can corrupt the array for a later one. The suite is organised into functional areas: **fork visibility** — forks hidden by default, revealed by the toggle, toggle absent when no forks exist; **search** — case-insensitive name matching, empty-result message; **inner checkbox direct interaction** — `fireEvent.click` on the `<input type="checkbox">` (not the `<li>`) exercises the `onChange` handler and the `onClick={e => e.stopPropagation()}` guard; because the inner click is stopped from propagating, the parent `<li>` click does not also fire, so the selection toggles exactly once (not twice back to unselected); a second click deselects symmetrically; **keyboard interaction** — `Space` and `Enter` on a focused row both toggle selection (dispatched with `fireEvent.keyDown` on the `<li>` reached via `closest('li')`), and a second keypress deselects a selected row; **combined search and fork filter** — enabling the fork toggle then applying a search that only matches the fork exercises both filters simultaneously and triggers the empty-state message when the toggle is disabled again; **row element rendering** — fork badge shown only when `showForks && repo.fork`, star count with `aria-label` rendered only when `stargazerCount > 0`; **relativeTime guard** — rendering a repo with `updatedAt: 'invalid-date'` asserts "just now" is displayed and no "NaN" substring appears, exercising the `isNaN` guard; **relativeTime month/year thresholds** — a 40-day-old timestamp renders as `"1mo ago"` (exercises the `months < 12` branch), a 400-day-old timestamp renders as `"1y ago"` (exercises the `Math.floor(months/12)y` years return); **select-all edge cases** — select-all checkbox is `disabled` (not absent) when `visibleRepos` is empty; **select-all toggle** — selects all visible repos on first click, deselects all on second; **Continue flow** — `sessionStorage['depo:selected']` populated, `router.push('/confirm')` called; **display** — relative time rendered, description shown when non-null and absent when null.
 
-### Mock Patterns
+### Mock patterns
 
 Tests mock at the module boundary rather than calling real external services:
 
@@ -127,7 +127,7 @@ jest.mock('@/components/Foo', () => ({
 }))
 ```
 
-### End-to-End Tests (Playwright)
+### End-to-end tests (Playwright)
 
 ```bash
 npx playwright test          # run E2E suite (requires running app)
@@ -164,7 +164,7 @@ The ESLint config is at `.eslintrc.json`. It extends `next/core-web-vitals` whic
 
 ---
 
-## Type Checking
+## Type checking
 
 ```bash
 npx tsc --noEmit     # type-check without emitting output
@@ -174,7 +174,7 @@ TypeScript is configured in `tsconfig.json` with `strict: true`. All public APIs
 
 ---
 
-## Pre-Commit Checklist
+## Pre-commit checklist
 
 Before pushing:
 
@@ -185,7 +185,7 @@ Before pushing:
 
 ---
 
-## Environment Notes
+## Environment notes
 
 - `lib/sessionOptions.ts` is intentionally separated from `lib/session.ts`: it exports the iron-session config and `SessionData` type without importing `next/headers`. This lets API routes and server components import session config without pulling in Next.js server-only APIs.
 - `app/api/delete/route.ts` has a `60s` Vercel function timeout in `vercel.json`. This is required because sequential deletion with 150ms delays can take up to ~15 seconds for a full 100-repo batch.
