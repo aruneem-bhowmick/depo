@@ -27,7 +27,7 @@ npm test -- --coverage    # generate coverage report
 ```
 tests/
 ├── unit/
-│   ├── config.test.ts          next.config.ts image domain validation
+│   ├── config.test.ts          next.config.js image domain validation
 │   ├── constants.test.ts       constants values and key uniqueness
 │   ├── generateCommand.test.ts gh and curl command generation (14 cases)
 │   ├── github.test.ts          createOctokit, listPublicRepos, deleteRepo
