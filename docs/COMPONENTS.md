@@ -2,13 +2,13 @@
 
 ---
 
-## Server Components (Pages)
+## Server components (pages)
 
 These are async React server components rendered in the App Router. They run exclusively on the server and can call `getSession()`, set cookies, and access environment variables directly.
 
 ---
 
-### Landing Page (`app/page.tsx`)
+### Landing page (`app/page.tsx`)
 
 **File**: `app/page.tsx`
 
@@ -61,7 +61,7 @@ interface HomeProps {
 
 ---
 
-### Repos Page (`app/repos/page.tsx`)
+### Repos page (`app/repos/page.tsx`)
 
 **File**: `app/repos/page.tsx`
 
@@ -89,7 +89,7 @@ The repo selection page. Protected by middleware — only reachable when `sessio
 
 ---
 
-### Confirmation Page (`app/confirm/page.tsx`)
+### Confirmation page (`app/confirm/page.tsx`)
 
 **File**: `app/confirm/page.tsx`
 
@@ -125,7 +125,7 @@ The confirmation and execution page. Reads the repo selection from `sessionStora
 
 ---
 
-### Done Page (`app/done/page.tsx`)
+### Done page (`app/done/page.tsx`)
 
 **File**: `app/done/page.tsx`
 
@@ -205,7 +205,7 @@ The final summary page rendered after a bulk deletion completes. Displays how ma
 
 ---
 
-## React Components
+## React components
 
 All five components are client components (`'use client'`). They are rendered inside server component page shells that pass data as props.
 
@@ -434,7 +434,7 @@ No authentication check is performed before the fetch — calling sign-out while
 
 ---
 
-## Library Utilities
+## Library utilities
 
 ---
 
