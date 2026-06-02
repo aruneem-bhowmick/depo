@@ -4,7 +4,7 @@ Depo is a Next.js 14 App Router application deployed as serverless functions on 
 
 ---
 
-## Request Flow
+## Request flow
 
 ```
 User
@@ -62,7 +62,7 @@ The server/client split is intentional: pages that need `sessionStorage` or inte
 
 ---
 
-## API Routes
+## API routes
 
 | Method | Route | Auth | Purpose |
 |--------|-------|------|---------|
@@ -91,7 +91,7 @@ See [API.md](API.md) for full request/response documentation.
 
 ---
 
-## Session Strategy
+## Session strategy
 
 Depo uses [`iron-session`](https://github.com/vvo/iron-session) — an encrypted, signed, HTTP-only cookie. There is no database.
 
@@ -107,7 +107,7 @@ The GitHub access token lives exclusively inside this cookie and is read server-
 
 ---
 
-## State Between Pages
+## State between pages
 
 Cross-page state is stored in two different mechanisms depending on its security requirements:
 
@@ -128,7 +128,7 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 ---
 
-## Global Layout
+## Global layout
 
 `app/layout.tsx` is the root server component that wraps every page. It:
 
@@ -141,7 +141,7 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 ---
 
-## Tech Stack
+## Tech stack
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -154,7 +154,7 @@ Cross-page state is stored in two different mechanisms depending on its security
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 depo/
