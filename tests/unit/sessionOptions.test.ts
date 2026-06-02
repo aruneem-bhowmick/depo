@@ -27,7 +27,11 @@ describe('SESSION_SECRET validation', () => {
   const originalSecret = process.env.SESSION_SECRET
 
   afterEach(() => {
-    process.env.SESSION_SECRET = originalSecret
+    if (originalSecret === undefined) {
+      delete process.env.SESSION_SECRET
+    } else {
+      process.env.SESSION_SECRET = originalSecret
+    }
   })
 
   it('throws when password is accessed without SESSION_SECRET', () => {
