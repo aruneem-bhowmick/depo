@@ -14,8 +14,8 @@ export const metadata: Metadata = {
  * Root layout for the entire Depo application.
  *
  * Renders the persistent shell: the `<html>` element with a dark-mode
- * initialisation script (prevents FOUC), the Inter font body, a top navigation
- * bar, and the `<main>` content area.
+ * initialisation script (prevents FOUC), a Tailwind `font-sans` body, a top
+ * navigation bar, and the `<main>` content area.
  *
  * The navigation bar shows the Depo wordmark on the left and — when the user is
  * authenticated — their GitHub avatar, login name, and a sign-out button on the
