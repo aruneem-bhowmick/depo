@@ -3,7 +3,8 @@
  *
  * Covers: sessionStorage-empty redirect, green/amber colour logic, singular/plural
  * count text, failed-repos section, sessionStorage cleanup, and the two action
- * buttons ("Delete more" → /repos, "Sign out" → POST /api/signout then /).
+ * buttons ("Delete more" → /repos, "Sign out" → POST /api/signout then /,
+ * suppressed navigation on non-2xx response, suppressed navigation on network error).
  */
 
 const mockPush = jest.fn()
@@ -102,5 +103,25 @@ describe('/done page', () => {
       expect(fetch).toHaveBeenCalledWith('/api/signout', { method: 'POST' })
       expect(mockPush).toHaveBeenCalledWith('/')
     })
+  })
+
+  it('"Sign out" suppresses navigation and shows error on non-2xx response', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500 })
+    setResults([{ repo: 'r1', status: 'deleted' }])
+    render(<DonePage />)
+    await waitFor(() => screen.getByRole('button', { name: /sign out/i }))
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('"Sign out" suppresses navigation and shows error on network failure', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    setResults([{ repo: 'r1', status: 'deleted' }])
+    render(<DonePage />)
+    await waitFor(() => screen.getByRole('button', { name: /sign out/i }))
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

@@ -29,13 +29,15 @@ import type { DeletionResult } from '@/lib/types'
  *
  * **Actions**:
  * - "Delete more" navigates to `/repos` so the user can start a fresh selection.
- * - "Sign out" sends `POST /api/signout`, then navigates to `/` and refreshes
- *   the router so the root layout re-renders without session data.
+ * - "Sign out" sends `POST /api/signout`. Navigation only proceeds when the
+ *   response is ok; a non-2xx response or a network error surfaces an inline
+ *   error message and leaves the user on the page.
  */
 export default function DonePage() {
   const router = useRouter()
   const [results, setResults] = useState<DeletionResult[] | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
 
   useEffect(() => {
     const raw = sessionStorage.getItem(SESSION_KEY_RESULTS)
@@ -60,9 +62,17 @@ export default function DonePage() {
   const failed = results.filter(r => r.status === 'error')
   const allSucceeded = failed.length === 0
 
-  /** Sends `POST /api/signout` then redirects to the landing page. */
   async function handleSignOut() {
-    await fetch('/api/signout', { method: 'POST' })
+    try {
+      const response = await fetch('/api/signout', { method: 'POST' })
+      if (!response.ok) {
+        setSignOutError(`Sign-out failed (${response.status}). Please try again.`)
+        return
+      }
+    } catch {
+      setSignOutError('Sign-out failed. Please try again.')
+      return
+    }
     router.push('/')
     router.refresh()
   }
@@ -99,19 +109,24 @@ export default function DonePage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.push('/repos')}
-          className="rounded-md border border-zinc-200 dark:border-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500"
-        >
-          Delete more
-        </button>
-        <button
-          onClick={handleSignOut}
-          className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 rounded px-2 py-1"
-        >
-          Sign out
-        </button>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/repos')}
+            className="rounded-md border border-zinc-200 dark:border-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500"
+          >
+            Delete more
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500 rounded px-2 py-1"
+          >
+            Sign out
+          </button>
+        </div>
+        {signOutError && (
+          <p role="alert" className="text-xs text-red-500">{signOutError}</p>
+        )}
       </div>
     </div>
   )
