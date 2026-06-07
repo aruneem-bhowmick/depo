@@ -169,7 +169,7 @@ export function RepoList({ repos }: RepoListProps) {
       </div>
 
       {/* Repo list */}
-      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md overflow-hidden">
+      <ul className="relative z-[1] divide-y divide-zinc-100 dark:divide-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-md overflow-hidden bg-white dark:bg-zinc-950">
         {visibleRepos.length === 0 ? (
           <li className="py-8 text-center text-sm text-zinc-400">
             {search ? 'No repositories match your search.' : 'No repositories to show.'}
